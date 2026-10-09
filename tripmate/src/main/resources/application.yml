@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: tripmate
+  # session配置
+  session:
+    store-type: redis
+    # session 30天过期
+    timeout: 2592000
+  profiles:
+    active: dev
+  # mysql
+  datasource:
+    driver-class-name: ${tripmate.datasource.driver-class-name}
+    url: ${tripmate.datasource.url}
+    username: ${tripmate.datasource.username}
+    password: ${tripmate.datasource.password}
+  data:
+    redis:
+      host: ${tripmate.data.redis.host}
+      port: ${tripmate.data.redis.port}
+      password: ${tripmate.data.redis.password}
+      ttl: ${tripmate.data.redis.ttl}
+      database: 0
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+    # cookie 30天过期
+    session:
+      cookie:
+        max-age: 2592000
+# knife4j
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
