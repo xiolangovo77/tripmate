@@ -1,7 +1,7 @@
 package com.ecnu.tripmate.mapper;
 
 import com.mybatisflex.core.BaseMapper;
-import com.ecnu.tripmate.model.entity.user.User;
+import com.ecnu.tripmate.model.entity.User;
 
 /**
  * 用户表 映射层。

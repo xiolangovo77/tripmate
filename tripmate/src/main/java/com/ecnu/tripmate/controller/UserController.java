@@ -8,7 +8,7 @@ import com.ecnu.tripmate.exception.ThrowUtils;
 import com.ecnu.tripmate.model.dto.user.UserLoginRequest;
 import com.ecnu.tripmate.model.dto.user.UserRegisterRequest;
 import com.ecnu.tripmate.model.dto.user.UserUpdateRequest;
-import com.ecnu.tripmate.model.entity.user.User;
+import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.user.LoginUserVO;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;

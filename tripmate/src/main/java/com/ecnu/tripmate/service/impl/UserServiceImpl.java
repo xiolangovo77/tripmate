@@ -6,22 +6,19 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONUtil;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
-import com.ecnu.tripmate.model.dto.user.UserLoginRequest;
 import com.ecnu.tripmate.model.dto.user.UserUpdateRequest;
 import com.ecnu.tripmate.model.enums.TravelPaceEnum;
 import com.ecnu.tripmate.model.enums.UserRoleEnum;
 import com.ecnu.tripmate.model.vo.user.LoginUserVO;
 import com.ecnu.tripmate.service.UserService;
-import com.mybatisflex.annotation.Column;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
-import com.ecnu.tripmate.model.entity.user.User;
+import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.mapper.UserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 

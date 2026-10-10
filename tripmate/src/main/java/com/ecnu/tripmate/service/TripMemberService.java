@@ -1,0 +1,47 @@
+package com.ecnu.tripmate.service;
+
+import com.ecnu.tripmate.model.entity.Trip;
+import com.ecnu.tripmate.model.entity.User;
+import com.mybatisflex.core.service.IService;
+import com.ecnu.tripmate.model.entity.TripMember;
+
+import java.math.BigDecimal;
+
+/**
+ * 旅行成员表 服务层。
+ *
+ * @author Wolfcub
+ */
+public interface TripMemberService extends IService<TripMember> {
+
+    /**
+     * 同步加入发起人旅行信息
+     * @param tripId 旅行id
+     * @param logiguser 发起人信息
+     * @param budgetLimit 发起人旅行预算
+     * @return
+     */
+    boolean addByOwner(long tripId, User logiguser, BigDecimal budgetLimit);
+
+    /**
+     * 修改旅行成员状态
+     * @param tripId 旅行id
+     * @param userId 用户id
+     * @param status 旅行成员状态
+     * @param loginuser 旅行成员信息
+     * @return
+     */
+    boolean updateTripMemberStatus(long tripId, long userId, String status, User loginuser);
+
+    /**
+     * 更新旅行成员信息
+     * @param tripId 旅行id
+     * @param userId 用户id
+     * @param budgetLimit 预算
+     * @param travelPace 旅行节奏
+     * @param favoriteActivities 旅行偏好
+     * @param loginuser
+     * @return
+     */
+    boolean update(long tripId, long userId, BigDecimal budgetLimit, String travelPace, String favoriteActivities, User loginuser);
+}

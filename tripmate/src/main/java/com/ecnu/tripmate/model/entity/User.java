@@ -1,11 +1,10 @@
-package com.ecnu.tripmate.model.entity.user;
+package com.ecnu.tripmate.model.entity;
 
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import java.io.Serializable;
-import java.math.BigInteger;
 import java.time.LocalDateTime;
 
 import java.io.Serial;
