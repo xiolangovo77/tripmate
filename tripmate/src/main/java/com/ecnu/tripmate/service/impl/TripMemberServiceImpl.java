@@ -37,15 +37,45 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
     private TripService tripService;
 
     @Override
-    public boolean addByOwner(long tripId, User logiguser, BigDecimal budgetLimit) {
-        // 设置默认值
+    public Long add(long tripId, String role, User logiguser, BigDecimal budgetLimit) {
+        // 1、校验参数
+        if(tripId <= 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
+        }
+        if(role == null || TripMemberRoleEnum.getEnumByValue(role) == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行成员角色不合法");
+        }
+        if(budgetLimit == null || budgetLimit.compareTo(BigDecimal.ZERO) <= 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "预算金额必须为正数");
+        }
+        // 2、判断旅行是否存在
+        tripService.isTripExists(tripId);
+        // 3、如果是发起人，需要判断是否为本场旅行的唯一发起人
+        String owner = TripMemberRoleEnum.OWNER.getValue();
+        if(owner.equals(role)){
+            QueryWrapper queryWrapper = new QueryWrapper();
+            queryWrapper.eq("tripId", tripId)
+                    .eq("role", owner);
+            long count = this.mapper.selectCountByQuery(queryWrapper);
+            if(count > 0){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "该旅行已存在发起人");
+            }
+        }
+        // 4、是否重复加入旅行
+        QueryWrapper queryWrapper1 = new QueryWrapper();
+        queryWrapper1.eq("tripId", tripId)
+                .eq("userId", logiguser.getId());
+        long count1 = this.mapper.selectCountByQuery(queryWrapper1);
+        if(count1 > 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "您已加入该旅行");
+        }
+        // 5、设置默认值
         Long userId = logiguser.getId();
-        String role = TripMemberRoleEnum.OWNER.getValue();
         String travelPace = logiguser.getTravelPace();
-        String favoriteActivities = logiguser.getFavoriteActivities();
         String status = TripMemberStatusEnum.JOINED.getValue();
+        String favoriteActivities = logiguser.getFavoriteActivities();
         LocalDateTime joinedTime = LocalDateTime.now();
-        // 插入数据
+        // 6、插入数据
         TripMember tripMember = TripMember.builder()
                 .tripId(tripId)
                 .userId(userId)
@@ -58,9 +88,9 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
                 .build();
         boolean saveResult = this.save(tripMember);
         if(!saveResult){
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "加入发起人信息失败，数据库错误");
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "加入成员失败，数据库错误");
         }
-        return saveResult;
+        return tripMember.getTripId();
     }
 
     @Override

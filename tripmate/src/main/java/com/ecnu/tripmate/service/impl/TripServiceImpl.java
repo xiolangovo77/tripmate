@@ -6,6 +6,7 @@ import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.entity.TripMember;
 import com.ecnu.tripmate.model.entity.User;
+import com.ecnu.tripmate.model.enums.trip.TripMemberRoleEnum;
 import com.ecnu.tripmate.model.enums.trip.TripMemberStatusEnum;
 import com.ecnu.tripmate.model.enums.trip.TripStatusEnum;
 import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
@@ -65,10 +66,7 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "加入旅行失败，数据库错误");
         }
         // 4、同步插入trip_member表
-        boolean addOwerResult = tripMemberService.addByOwner(trip.getId(), loginuser, budgetLimit);
-        if(!addOwerResult){
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "加入发起人信息失败，数据库错误");
-        }
+        tripMemberService.add(trip.getId(), TripMemberRoleEnum.OWNER.getValue(),loginuser, budgetLimit);
         return trip.getId();
     }
 

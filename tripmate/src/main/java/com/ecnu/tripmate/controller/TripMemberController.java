@@ -5,6 +5,7 @@ import com.ecnu.tripmate.common.ResultUtils;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.dto.trip.TripUpdateStatusRequest;
+import com.ecnu.tripmate.model.dto.tripMember.TripMemberAddRequest;
 import com.ecnu.tripmate.model.dto.tripMember.TripMemberUpdateRequest;
 import com.ecnu.tripmate.model.dto.tripMember.TripMemberUpdateStatusRequest;
 import com.ecnu.tripmate.model.entity.User;
@@ -85,5 +86,26 @@ public class TripMemberController {
         String favoriteActivities = tripMemberUpdateRequest.getFavoriteActivities();
         boolean updateResult = tripMemberService.update(tripId, userId, budgetLimit, travelPace, favoriteActivities, loginUser);
         return ResultUtils.success(updateResult);
+    }
+
+    /**
+     * 添加旅行成员
+     * @param tripMemberAddRequest 添加旅行成员请求
+     * @param request
+     * @return
+     */
+    @PostMapping("add")
+    public BaseResponse<Long> add(@RequestBody TripMemberAddRequest tripMemberAddRequest, HttpServletRequest request){
+        if(tripMemberAddRequest == null || request == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 获取用户登录信息
+        User loginUser = userService.getLoginUser(request);
+        // 获取传入参数
+        long tripId = tripMemberAddRequest.getTripId();
+        BigDecimal budgetLimit = tripMemberAddRequest.getBudgetLimit();
+        String role = tripMemberAddRequest.getRole();
+        long tripMemberId = tripMemberService.add(tripId, role, loginUser, budgetLimit);
+        return ResultUtils.success(tripMemberId);
     }
 }

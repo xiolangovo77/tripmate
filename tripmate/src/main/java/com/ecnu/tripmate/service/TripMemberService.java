@@ -15,13 +15,14 @@ import java.math.BigDecimal;
 public interface TripMemberService extends IService<TripMember> {
 
     /**
-     * 同步加入发起人旅行信息
+     * 加入成员信息
      * @param tripId 旅行id
-     * @param logiguser 发起人信息
-     * @param budgetLimit 发起人旅行预算
+     * @param role 成员角色
+     * @param logiguser 成员信息
+     * @param budgetLimit 成员旅行预算
      * @return
      */
-    boolean addByOwner(long tripId, User logiguser, BigDecimal budgetLimit);
+    Long add(long tripId, String role, User logiguser, BigDecimal budgetLimit);
 
     /**
      * 修改旅行成员状态

@@ -72,7 +72,9 @@ CREATE TABLE IF NOT EXISTS `trip_invitation` (
     `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updateTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_trip_invitation_code` (`inviteCode`)
+    UNIQUE KEY `uk_trip_invitation_code` (`inviteCode`),
+    KEY `idx_trip_invitation_trip_status` (`tripId`, `status`),
+    KEY `idx_trip_invitation_trip_code` (`tripId`, `inviteCode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='旅行邀请表';
 
 -- 5. 行程：每个旅行只保留一份当前方案，AI 调整时更新该方案及明细。
