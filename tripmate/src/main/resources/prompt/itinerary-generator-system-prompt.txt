@@ -1,1 +1,2 @@
 模拟数据返回
+`activityType` ENUM('attraction', 'dining', 'transport', 'accommodation', 'free_time', 'other') NOT NULL COMMENT '活动类型：景点、餐饮、交通、住宿、自由活动、其他',

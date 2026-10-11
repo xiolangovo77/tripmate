@@ -35,13 +35,13 @@ public class Itinerary implements Serializable {
      * 行程ID
      */
     @Id(keyType = KeyType.Auto)
-    private BigInteger id;
+    private Long id;
 
     /**
      * 旅行ID，一次旅行对应一份当前行程
      */
     @Column("tripId")
-    private BigInteger tripId;
+    private Long tripId;
 
     /**
      * 行程标题

@@ -36,13 +36,13 @@ public class ItineraryItem implements Serializable {
      * 行程明细ID
      */
     @Id(keyType = KeyType.Auto)
-    private BigInteger id;
+    private Long id;
 
     /**
      * 所属行程ID
      */
     @Column("itineraryId")
-    private BigInteger itineraryId;
+    private Long itineraryId;
 
     /**
      * 第几天，从1开始
