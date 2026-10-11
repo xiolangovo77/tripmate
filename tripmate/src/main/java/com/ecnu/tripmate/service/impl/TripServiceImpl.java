@@ -171,4 +171,51 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
         tripVO.setTripMembers(tripMembersVO);
         return tripVO;
     }
+
+    @Override
+    public String getInitItineraryPrompt(Long tripId) {
+        // 1、校验参数
+        if(tripId == null || tripId <= 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不存在");
+        }
+        // 2、获取旅行信息
+        Trip trip = isTripExists(tripId);
+        // 3、获取旅行成员信息
+        QueryWrapper queryWrapper = new QueryWrapper();
+        queryWrapper.eq("tripId", tripId)
+                .eq("status", TripMemberStatusEnum.JOINED.getValue());
+        List<TripMember> tripMemberList = tripMemberService.getMapper().selectListByQuery(queryWrapper);
+        if(tripMemberList == null || tripMemberList.isEmpty()){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "该旅行没有旅行成员");
+        }
+        // 4、生成旅行基本信息
+        StringBuilder initItineraryPrompt = new StringBuilder();
+        initItineraryPrompt.append(String.format("""
+            【旅行基本信息】
+            旅行标题：%s
+            目的地：%s
+            旅行天数：%d天
+            旅行人数：%d人
+
+            【旅行成员信息】
+            """, trip.getTitle(), trip.getDestination(), trip.getTravelDays(), tripMemberList.size()));
+        // 5、生成旅行成员信息
+        for(int i = 0; i < tripMemberList.size(); i++){
+            TripMember tripMember = tripMemberList.get(i);
+            String nickname = tripMember.getNickname();
+            BigDecimal budgetLimit = tripMember.getBudgetLimit();
+            String travelPace = tripMember.getTravelPace();
+            String favoriteActivities = tripMember.getFavoriteActivities();
+            String budget = budgetLimit.toPlainString();
+            initItineraryPrompt.append(String.format("""
+
+                成员%d：
+                名字：%s
+                预算：%s
+                节奏偏好：%s
+                活动偏好：%s
+                """, i + 1, nickname, budget, travelPace, favoriteActivities));
+        }
+        return initItineraryPrompt.toString();
+    }
 }

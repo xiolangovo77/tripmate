@@ -1,6 +1,5 @@
 package com.ecnu.tripmate.model.vo.trip;
 
-import com.ecnu.tripmate.model.entity.TripMember;
 import lombok.Data;
 
 import java.io.Serial;

@@ -111,4 +111,15 @@ public class TripController {
         TripVO result = tripService.getTripById(tripId);
         return ResultUtils.success(result);
     }
+
+    /**
+     * 获取行程初始化的提示词
+     * @param tripId 旅行id
+     * @return
+     */
+    @GetMapping("getPrompt")
+    public BaseResponse<String> getPrompt(@RequestParam long tripId){
+        String initItineraryPrompt = tripService.getInitItineraryPrompt(tripId);
+        return ResultUtils.success(initItineraryPrompt);
+    }
 }

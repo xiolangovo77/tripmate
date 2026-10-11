@@ -22,6 +22,11 @@ public class TripMemberVO implements Serializable {
     private String role;
 
     /**
+     * 昵称
+     */
+    private String nickname;
+
+    /**
      * 本次旅行的个人预算上限
      */
     private BigDecimal budgetLimit;

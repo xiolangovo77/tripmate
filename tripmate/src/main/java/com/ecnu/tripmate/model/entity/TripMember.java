@@ -51,6 +51,11 @@ public class TripMember implements Serializable {
     private Long userId;
 
     /**
+     * 昵称
+     */
+    private String nickname;
+
+    /**
      * 成员角色：发起人、普通成员
      */
     private String role;

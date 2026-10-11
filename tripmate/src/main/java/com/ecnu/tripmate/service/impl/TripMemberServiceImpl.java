@@ -71,6 +71,7 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
         }
         // 5、设置默认值
         Long userId = logiguser.getId();
+        String nickname = logiguser.getNickname();
         String travelPace = logiguser.getTravelPace();
         String status = TripMemberStatusEnum.JOINED.getValue();
         String favoriteActivities = logiguser.getFavoriteActivities();
@@ -79,6 +80,7 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
         TripMember tripMember = TripMember.builder()
                 .tripId(tripId)
                 .userId(userId)
+                .nickname(nickname)
                 .role(role)
                 .budgetLimit(budgetLimit)
                 .travelPace(travelPace)

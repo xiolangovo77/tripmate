@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS `trip_member` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '成员记录ID',
     `tripId` BIGINT UNSIGNED NOT NULL COMMENT '旅行ID',
     `userId` BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+    `nickname` VARCHAR(64) NOT NULL COMMENT '昵称',
     `role` ENUM('owner', 'member') NOT NULL DEFAULT 'member' COMMENT '成员角色：发起人、普通成员',
     `budgetLimit` DECIMAL(12,2) NOT NULL COMMENT '本次旅行的个人预算上限',
     `travelPace` ENUM('relaxed', 'balanced', 'packed') NOT NULL COMMENT '本次旅行的节奏快照',

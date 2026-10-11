@@ -64,4 +64,11 @@ public interface TripService extends IService<Trip> {
      * @return
      */
     TripVO getTripById(long tripId);
+
+    /**
+     * 获取行程初始化的提示词
+     * @param tripId 旅行id
+     * @return
+     */
+    String getInitItineraryPrompt(Long tripId);
 }
