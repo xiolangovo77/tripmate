@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS `itinerary` (
     `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updateTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_itinerary_trip` (`tripId`)
+    KEY `idx_itinerary_trip` (`tripId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='行程表';
 
 -- 6. 行程明细：按第几天、当天顺序展示。
@@ -113,7 +113,8 @@ CREATE TABLE IF NOT EXISTS `itinerary_item` (
     `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updateTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_itinerary_item_day_order` (`itineraryId`, `dayNumber`, `sortOrder`)
+    UNIQUE KEY `uk_itinerary_item_day_order` (`itineraryId`, `dayNumber`, `sortOrder`),
+    KEY `idx_itinerary_id` (`itineraryId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='行程明细表';
 
 -- 7. 旅行消息：保存成员群聊和 AI 回复；普通聊天不调用 AI，用户 @AI 才触发回复。

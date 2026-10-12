@@ -1,6 +1,5 @@
 package com.ecnu.tripmate.ai.model;
 
-import com.mybatisflex.annotation.Column;
 import lombok.Data;
 
 import java.io.Serial;

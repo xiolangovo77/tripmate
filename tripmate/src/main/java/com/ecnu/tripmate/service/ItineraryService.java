@@ -1,6 +1,8 @@
 package com.ecnu.tripmate.service;
 
+import com.ecnu.tripmate.ai.model.ItineraryResult;
 import com.ecnu.tripmate.model.entity.User;
+import com.ecnu.tripmate.model.vo.itinerary.ItineraryVO;
 import com.mybatisflex.core.service.IService;
 import com.ecnu.tripmate.model.entity.Itinerary;
 
@@ -19,4 +21,41 @@ public interface ItineraryService extends IService<Itinerary> {
      * @return
      */
     Long add(Long tripId, String initItineraryPrompt, User loginUser);
+
+    /**
+     * 确认行程
+     * @param id 行程id
+     * @param loginuser 登录用户信息
+     * @return
+     */
+    int confirmed(Long id, User loginuser);
+
+    /**
+     * 获取行程和行程明细
+     * @param id 行程id
+     * @return
+     */
+    ItineraryVO get(Long id);
+
+    /**
+     * 更新行程和行程明细
+     * @param id 行程id
+     * @param loginuser 登陆用户信息
+     * @return
+     */
+    long update(Long id, User loginuser);
+
+    /**
+     * 获取行程更新的提示词
+     * @param itineraryResult 行程和行程明细的信息
+     * @return
+     */
+    String getUpdateItineraryPrompt(ItineraryResult itineraryResult);
+
+    /**
+     * 删除行程和行程明细
+     * @param id 行程id
+     * @return
+     */
+    boolean delete(Long id);
 }

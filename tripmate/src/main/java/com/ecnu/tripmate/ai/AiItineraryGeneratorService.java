@@ -12,4 +12,12 @@ public interface AiItineraryGeneratorService {
       */
      @SystemMessage(fromResource = "prompt/itinerary-generator-system-prompt.txt")
      ItineraryResult generatorItinerary(String userMessage);
+
+     /**
+      * 更新行程计划
+      * @param userMessage 用户消息
+      * @return
+      */
+     @SystemMessage(fromResource = "prompt/itinerary-update-system-prompt.txt")
+     ItineraryResult updateItinerary(String userMessage);
 }

@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 
 import java.io.Serial;
 
+import com.mybatisflex.core.keygen.KeyGenerators;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,7 +35,7 @@ public class Itinerary implements Serializable {
     /**
      * 行程ID
      */
-    @Id(keyType = KeyType.Auto)
+    @Id(keyType = KeyType.Generator, value = KeyGenerators.snowFlakeId)
     private Long id;
 
     /**
@@ -68,7 +69,7 @@ public class Itinerary implements Serializable {
      * 确认人用户ID
      */
     @Column("confirmedBy")
-    private BigInteger confirmedBy;
+    private Long confirmedBy;
 
     /**
      * 确认时间
