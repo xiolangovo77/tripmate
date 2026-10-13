@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS `trip_message` (
     `role` ENUM('user', 'assistant') NOT NULL COMMENT '消息角色：用户、AI',
     `content` MEDIUMTEXT NOT NULL COMMENT '消息内容，用户消息发送成功或AI回复完成后保存',
     `replyToId` BIGINT UNSIGNED DEFAULT NULL COMMENT '回复的消息ID，可为空，必须属于同一旅行',
+    `recallStatus` ENUM('normal', 'recalled') NOT NULL DEFAULT 'normal' COMMENT '撤回状态：正常、已撤回',
     `changeStatus` ENUM('none', 'pending', 'applied', 'ignored') NOT NULL DEFAULT 'none' COMMENT '建议状态：无修改建议、待处理、已应用、已忽略；用户消息和普通AI回复为none',
     `isDelete` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除，1-已删除',
     `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
