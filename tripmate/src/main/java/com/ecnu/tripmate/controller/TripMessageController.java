@@ -4,6 +4,7 @@ import com.ecnu.tripmate.common.BaseResponse;
 import com.ecnu.tripmate.common.ResultUtils;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
+import com.ecnu.tripmate.model.dto.tripMessage.TripMessageAddAiRequest;
 import com.ecnu.tripmate.model.dto.tripMessage.TripMessageAddRequest;
 import com.ecnu.tripmate.model.entity.TripMessage;
 import com.ecnu.tripmate.model.entity.User;
@@ -83,5 +84,25 @@ public class TripMessageController {
         User loginUser = userService.getLoginUser(request);
         List<TripMessageVO> tripMessageVOList = tripMessageService.page(tripId, pageSize, lastCreateTime, loginUser);
         return ResultUtils.success(tripMessageVOList);
+    }
+
+    /**
+     * 添加ai消息
+     * @param tripMessageAddAiRequest 用户信息请求
+     * @param request
+     * @return
+     */
+    @PostMapping("addAi")
+    public BaseResponse<String> addAi(@RequestBody TripMessageAddAiRequest tripMessageAddAiRequest, HttpServletRequest request){
+        if(tripMessageAddAiRequest == null || request == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 获取用户登录信息
+        User loginUser = userService.getLoginUser(request);
+        // 获取传入参数
+        Long tripId = tripMessageAddAiRequest.getTripId();
+        Long replyToId = tripMessageAddAiRequest.getReplyToId();
+        String aiMessage = tripMessageService.addAi(tripId, replyToId, loginUser);
+        return ResultUtils.success(aiMessage);
     }
 }

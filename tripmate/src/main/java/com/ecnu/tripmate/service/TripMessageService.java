@@ -41,4 +41,13 @@ public interface TripMessageService extends IService<TripMessage> {
      * @return
      */
     List<TripMessageVO> page(Long tripId, int pageSize, LocalDateTime lastCreateTime, User loginUser);
+
+    /**
+     * 添加ai消息
+     * @param tripId 旅行id
+     * @param replyToId 用户消息id
+     * @param loginUser 登录用户信息
+     * @return
+     */
+    String addAi(Long tripId, Long replyToId, User loginUser);
 }
