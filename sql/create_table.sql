@@ -134,5 +134,5 @@ CREATE TABLE IF NOT EXISTS `trip_message` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_trip_message_trip_id` (`tripId`, `id`),
     KEY `idx_trip_message_trip_created` (`tripId`, `createTime`),
-    KEY `idx_trip_message_change_status` (`tripId`, `changeStatus`)
+    KEY `idx_trip_message_change_status` (`tripId`, `changeStatus`, `createTime`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='旅行消息表';

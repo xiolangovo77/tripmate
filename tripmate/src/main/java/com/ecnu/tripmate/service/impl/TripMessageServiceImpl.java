@@ -6,11 +6,13 @@ import com.ecnu.tripmate.ai.AiItineraryGeneratorService;
 import com.ecnu.tripmate.ai.model.MessageResponseResult;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
+import com.ecnu.tripmate.model.entity.Trip;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.enums.trip.TripMemberRoleEnum;
 import com.ecnu.tripmate.model.enums.tripMessage.TripMessageChangeStatusEnum;
 import com.ecnu.tripmate.model.enums.tripMessage.TripMessageRecallStatusEnum;
 import com.ecnu.tripmate.model.enums.tripMessage.TripMessageRoleEnum;
+import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.model.vo.tripMessage.TripMessageVO;
 import com.ecnu.tripmate.service.TripMemberService;
 import com.ecnu.tripmate.service.TripService;
@@ -23,8 +25,11 @@ import com.ecnu.tripmate.service.TripMessageService;
 import dev.langchain4j.agent.tool.P;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -219,5 +224,107 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "保存ai消息失败，数据库错误");
         }
         return content;
+    }
+
+    @Override
+    public List<TripMessageAiVO> getAiByChangeStatus(Long tripId, String changeStatus, User loginUser) {
+        // 1、参数校验
+        if(tripId <= 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
+        }
+        if(StrUtil.hasBlank(changeStatus) || TripMessageChangeStatusEnum.getEnumByValue(changeStatus) == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "建议状态不合法");
+        }
+        // 2、判断旅行是否存在
+        Trip trip = tripService.isTripExists(tripId);
+        // 3、判断该用户是否是该旅行的发起人
+        long userId = loginUser.getId();
+        long ownerId = trip.getOwnerId();
+        if(userId != ownerId){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有发起人才可以查询");
+        }
+        // 4、查询数据库
+        String role = TripMessageRoleEnum.ASSISTANT.getValue();
+        QueryWrapper queryWrapper1 = new QueryWrapper();
+        queryWrapper1.eq("tripId", tripId)
+                .eq("changeStatus", changeStatus)
+                .eq("role", role)
+                .orderBy("createTime", true);
+        List<TripMessage> tripMessageAiList = this.mapper.selectListByQuery(queryWrapper1);
+        if(tripMessageAiList == null || tripMessageAiList.isEmpty()){
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "ai消息列表为空");
+        }
+        // 5、返回VO
+        List<TripMessageAiVO> TripMessageAiVOList = BeanUtil.copyToList(tripMessageAiList, TripMessageAiVO.class);
+        return TripMessageAiVOList;
+    }
+
+    @Override
+    @Transactional
+    public int updateChangeStatusByIds(Long tripId, List<Long> ids, String changeStatus, User loginUser) {
+        // 1、参数校验
+        if(tripId <= 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
+        }
+        if(ids == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "消息ids不能为空");
+        }
+        for(Long id : ids){
+            if(id == null || id <= 0){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "消息id不合法");
+            }
+        }
+        if(StrUtil.hasBlank(changeStatus) || TripMessageChangeStatusEnum.getEnumByValue(changeStatus) == null
+        || (changeStatus.equals(TripMessageChangeStatusEnum.APPLIED.getValue())
+                && changeStatus.equals(TripMessageChangeStatusEnum.IGNORED.getValue()))){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "建议状态不合法");
+        }
+        // 2、判断旅行是否存在
+        Trip trip = tripService.isTripExists(tripId);
+        // 3、判断该用户是否是该旅行的发起人
+        long userId = loginUser.getId();
+        long ownerId = trip.getOwnerId();
+        if(userId != ownerId){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有发起人才可以查询");
+        }
+        // 4、判断消息列表是否合法
+        // 去重
+        List<Long> distinctIds = new ArrayList<>(new LinkedHashSet<>(ids));
+        QueryWrapper queryWrapper = new QueryWrapper();
+        queryWrapper.in("id", distinctIds)
+                .eq("tripId", tripId);
+        List<TripMessage> tripMessageList = this.mapper.selectListByQuery(queryWrapper);
+        if(tripMessageList.size() != distinctIds.size()){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "部分消息不存在或不属于该旅行");
+        }
+        String assistant = TripMessageRoleEnum.ASSISTANT.getValue();
+        String normal = TripMessageRecallStatusEnum.NORMAL.getValue();
+        for(TripMessage tripMessage : tripMessageList){
+            if(!assistant.equals(tripMessage.getRole())){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "只能修改AI消息的建议状态");
+            }
+            if(!normal.equals(tripMessage.getRecallStatus())){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "已撤回的消息不能修改建议状态");
+            }
+            if(!TripMessageChangeStatusEnum.PENDING.getValue().equals(tripMessage.getChangeStatus())){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "只能修改待处理的建议");
+            }
+        }
+        // 5、操作数据库
+        QueryWrapper updateQueryWrapper = new QueryWrapper();
+        updateQueryWrapper.in("id", distinctIds)
+                .eq("tripId", tripId)
+                .eq("role", assistant)
+                .eq("recallStatus", normal)
+                .eq("changeStatus", TripMessageChangeStatusEnum.PENDING.getValue());
+
+        TripMessage updateMessage = TripMessage.builder()
+                .changeStatus(changeStatus)
+                .build();
+        int updateCount = this.mapper.updateByQuery(updateMessage, updateQueryWrapper);
+        if(updateCount != distinctIds.size()){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "修改建议状态失败");
+        }
+        return updateCount;
     }
 }

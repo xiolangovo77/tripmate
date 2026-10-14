@@ -6,8 +6,11 @@ import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.dto.tripMessage.TripMessageAddAiRequest;
 import com.ecnu.tripmate.model.dto.tripMessage.TripMessageAddRequest;
+import com.ecnu.tripmate.model.dto.tripMessage.TripMessageGetAiByChangeStatusRequest;
+import com.ecnu.tripmate.model.dto.tripMessage.TripMessageUpdateChangeStatusByIdsRequest;
 import com.ecnu.tripmate.model.entity.TripMessage;
 import com.ecnu.tripmate.model.entity.User;
+import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.model.vo.tripMessage.TripMessageVO;
 import com.ecnu.tripmate.service.TripMessageService;
 import com.ecnu.tripmate.service.UserService;
@@ -104,5 +107,46 @@ public class TripMessageController {
         Long replyToId = tripMessageAddAiRequest.getReplyToId();
         String aiMessage = tripMessageService.addAi(tripId, replyToId, loginUser);
         return ResultUtils.success(aiMessage);
+    }
+
+    /**
+     * 根据建议状态获取的ai消息列表
+     * @param tripMessageGetAiByChangeStatusRequest 根据建议状态获取的ai消息列表请求
+     * @param request
+     * @return
+     */
+    @PostMapping("getAiByChangeStatus")
+    public BaseResponse<List<TripMessageAiVO>> getAiByChangeStatus(@RequestBody TripMessageGetAiByChangeStatusRequest tripMessageGetAiByChangeStatusRequest, HttpServletRequest request){
+        if(tripMessageGetAiByChangeStatusRequest == null || request == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 获取用户登录信息
+        User loginUser = userService.getLoginUser(request);
+        // 获取传入参数
+        Long tripId = tripMessageGetAiByChangeStatusRequest.getTripId();
+        String changeStatus = tripMessageGetAiByChangeStatusRequest.getChangeStatus();
+        List<TripMessageAiVO> tripMessageAiVOList = tripMessageService.getAiByChangeStatus(tripId, changeStatus, loginUser);
+        return ResultUtils.success(tripMessageAiVOList);
+    }
+
+    /**
+     * 批量修改ai消息的建议状态
+     * @param tripMessageUpdateChangeStatusByIdsRequest 批量修改ai消息的建议状态请求
+     * @param request
+     * @return
+     */
+    @PostMapping("updateChangeStatusByIds")
+    public BaseResponse<Integer> updateChangeStatusByIds(@RequestBody TripMessageUpdateChangeStatusByIdsRequest tripMessageUpdateChangeStatusByIdsRequest, HttpServletRequest request){
+        if(tripMessageUpdateChangeStatusByIdsRequest == null || request == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 获取用户登录信息
+        User loginUser = userService.getLoginUser(request);
+        // 获取传入参数
+        Long tripId = tripMessageUpdateChangeStatusByIdsRequest.getTripId();
+        List<Long> ids = tripMessageUpdateChangeStatusByIdsRequest.getIds();
+        String changeStatus = tripMessageUpdateChangeStatusByIdsRequest.getChangeStatus();
+        int updateCount = tripMessageService.updateChangeStatusByIds(tripId, ids, changeStatus, loginUser);
+        return ResultUtils.success(updateCount);
     }
 }

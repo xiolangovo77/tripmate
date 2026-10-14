@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.service.impl.impl;
+package com.ecnu.tripmate.service.impl;
 
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.ecnu.tripmate.model.entity.ItineraryItem;
