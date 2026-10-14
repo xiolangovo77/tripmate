@@ -11,8 +11,10 @@ import com.ecnu.tripmate.model.entity.ItineraryItem;
 import com.ecnu.tripmate.model.entity.Trip;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.enums.ItineraryStatusEnum;
+import com.ecnu.tripmate.model.enums.tripMessage.TripMessageChangeStatusEnum;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryItemVO;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryVO;
+import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.service.ItineraryItemService;
 import com.ecnu.tripmate.service.TripService;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -30,8 +32,10 @@ import java.math.BigDecimal;
 import java.sql.Time;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 行程表 服务层实现。
@@ -49,6 +53,9 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
 
     @Resource
     private ItineraryItemService itineraryItemService;
+
+    @Resource
+    private TripMessageServiceImpl tripMessageService;
 
     @Override
     @Transactional
@@ -204,7 +211,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
 
     @Override
     @Transactional
-    public long update(Long id, User loginuser) {
+    public long update(Long id, List<TripMessageAiVO> messageList, User loginuser) {
         // 1、获取行程和行程明细
         ItineraryVO itineraryVO = this.get(id);
         // 2、判断旅行、是否存在
@@ -216,30 +223,42 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
         if(ownerId != loginUserId){
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有发起人才能确认行程");
         }
-        // 4、获得更新行程的提示词
+        // 4、如果存在ai消息，将其改成已应用，并获取ai消息内容
+        StringBuilder updatePrompt = new StringBuilder();
+        if(messageList != null && !messageList.isEmpty()){
+            List<Long> messageIds = messageList.stream().map(TripMessageAiVO::getId).toList();
+            String messageInfos = messageList.stream()
+                    .map(message -> String.format("消息时间：%s 消息内容%s",
+                            message.getCreateTime(), message.getContent()))
+                            .collect(Collectors.joining("\n"));
+            updatePrompt.append("用户的建议如下：\n").append(messageInfos).append("\n");
+            tripMessageService.updateChangeStatusByIds(tripId, messageIds, TripMessageChangeStatusEnum.APPLIED.getValue(), loginuser);
+        }
+        // 5、获得更新行程的提示词
         ItineraryResult itineraryResult = new ItineraryResult();
         BeanUtil.copyProperties(itineraryVO, itineraryResult);
         List<ItineraryItemVO> itineraryItemList = itineraryVO.getItineraryItemVOList();
         List<ItineraryItemResult> itineraryItemResultList = BeanUtil.copyToList(itineraryItemList, ItineraryItemResult.class);
         itineraryResult.setItineraryItemResultList(itineraryItemResultList);
-        String updateItineraryPrompt = this.getUpdateItineraryPrompt(itineraryResult);
-        if(updateItineraryPrompt == null){
+        String itineraryInfos = this.getItineraryInfosPrompt(itineraryResult);
+        if(itineraryInfos == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成更新提示词失败");
         }
-        // 5、调用ai获取行程和行程明细
-        ItineraryResult itineraryUpdateResult = aiItineraryGeneratorService.updateItinerary(updateItineraryPrompt);
-        // 6、删除原来的行程和行程明细
+        updatePrompt.append(itineraryInfos);
+        // 6、调用ai获取行程和行程明细
+        ItineraryResult itineraryUpdateResult = aiItineraryGeneratorService.updateItinerary(updatePrompt.toString());
+        // 7、删除原来的行程和行程明细
         this.delete(id);
-        // 7、数据持久化
+        // 8、数据持久化
         return this.addItineraryByItineraryResult(itineraryUpdateResult, trip);
     }
 
     @Override
-    public String getUpdateItineraryPrompt(ItineraryResult itineraryResult) {
+    public String getItineraryInfosPrompt(ItineraryResult itineraryResult) {
 
-        StringBuilder updateItineraryPrompt = new StringBuilder();
+        StringBuilder itineraryInfosPrompt = new StringBuilder();
 
-        updateItineraryPrompt.append(String.format("""
+        itineraryInfosPrompt.append(String.format("""
             【当前行程信息】
             
             行程标题：%s
@@ -264,7 +283,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
 
         for (ItineraryItemResult item : itineraryItemResultList) {
 
-            updateItineraryPrompt.append(String.format("""
+            itineraryInfosPrompt.append(String.format("""
                 
                 第%d天
                 第%d个行程
@@ -305,14 +324,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
                             item.getEstimatedCostPerPerson().toPlainString()
             ));
         }
-
-        updateItineraryPrompt.append("""
-            
-            请根据以上当前行程信息，结合用户提出的修改需求，
-            对原有旅行计划进行调整，并返回修改后的完整行程。
-            """);
-
-        return updateItineraryPrompt.toString();
+        return itineraryInfosPrompt.toString();
     }
 
     @Override

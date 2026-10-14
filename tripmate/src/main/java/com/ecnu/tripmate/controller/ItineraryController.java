@@ -5,13 +5,17 @@ import com.ecnu.tripmate.common.ResultUtils;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.dto.Itinerary.ItineraryAddRequest;
+import com.ecnu.tripmate.model.dto.Itinerary.ItineraryUpdateRequest;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryVO;
+import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 import com.ecnu.tripmate.service.ItineraryService;
+
+import java.util.List;
 
 /**
  * 行程表 控制层。
@@ -77,16 +81,18 @@ public class ItineraryController {
 
     /**
      * 更新行程和行程明细
-     * @param id
+     * @param itineraryUpdateRequest 更新行程和行程明细请求
      * @param request
      * @return
      */
     @PutMapping("update")
-    public BaseResponse<Long> update(@RequestParam Long id, HttpServletRequest request){
+    public BaseResponse<Long> update(@RequestBody ItineraryUpdateRequest itineraryUpdateRequest, HttpServletRequest request){
         // 获取用户登录信息
         User loginUser = userService.getLoginUser(request);
         // 获取传入参数
-        Long updateResult = itineraryService.update(id, loginUser);
+        Long id = itineraryUpdateRequest.getId();
+        List<TripMessageAiVO> messageList = itineraryUpdateRequest.getMessageList();
+        Long updateResult = itineraryService.update(id, messageList, loginUser);
         return ResultUtils.success(updateResult);
     }
 }
