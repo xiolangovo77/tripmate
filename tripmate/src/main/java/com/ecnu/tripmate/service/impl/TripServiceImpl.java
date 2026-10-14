@@ -4,14 +4,17 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
+import com.ecnu.tripmate.model.dto.trip.TripPageRequest;
 import com.ecnu.tripmate.model.entity.TripMember;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.enums.trip.TripMemberRoleEnum;
 import com.ecnu.tripmate.model.enums.trip.TripMemberStatusEnum;
 import com.ecnu.tripmate.model.enums.trip.TripStatusEnum;
 import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
+import com.ecnu.tripmate.model.vo.trip.TripPageVO;
 import com.ecnu.tripmate.model.vo.trip.TripVO;
 import com.ecnu.tripmate.service.TripMemberService;
+import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.ecnu.tripmate.model.entity.Trip;
@@ -22,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -217,5 +221,49 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
                 """, i + 1, nickname, budget, travelPace, favoriteActivities));
         }
         return initItineraryPrompt.toString();
+    }
+
+    @Override
+    public List<TripPageVO> page(TripPageRequest tripPageRequest, User loginUser) {
+        // 1、获取请求体的参数
+        String title = tripPageRequest.getTitle();
+        String destination = tripPageRequest.getDestination();
+        Integer travelDays = tripPageRequest.getTravelDays();
+        String status = tripPageRequest.getStatus();
+        LocalDateTime beginTime = tripPageRequest.getBeginTime();
+        LocalDateTime endTime = tripPageRequest.getEndTime();
+        int pageNum = tripPageRequest.getPageNum();
+        int pageSize = tripPageRequest.getPageSize();
+        String sortField = tripPageRequest.getSortField();
+        String sortOrder = tripPageRequest.getSortOrder();
+        // 2、获取该用户的所有已加入的旅行id
+        long userId = loginUser.getId();
+        List<Long> tripIds = tripMemberService.getTripIdsByUserId(userId);
+        if(tripIds == null || tripIds.isEmpty()){
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "不存在旅行信息");
+        }
+        // 3、设置查询条件
+        QueryWrapper queryWrapper = new QueryWrapper();
+        queryWrapper.in("id", tripIds)
+                .like("title", title)
+                .like("destination", destination)
+                .eq("travelDays", travelDays)
+                .eq("status", status)
+                .gt("createTime", beginTime)
+                .lt("createTime", endTime);
+        if(sortField == null){
+            // 默认按照时间降序排列
+            queryWrapper.orderBy("createTime", false);
+        }else{
+            queryWrapper.orderBy(sortField, sortOrder.equals("ascend"));
+        }
+        // 4、查询数据
+        Page<Trip> page = this.page(Page.of(pageNum, pageSize), queryWrapper);
+        if(page == null || page.getPageSize() == 0){
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "不存在旅行信息");
+        }
+        // 5、返回数据
+        List<TripPageVO> tripPageVOList = BeanUtil.copyToList(page.getRecords(), TripPageVO.class);
+        return tripPageVOList;
     }
 }

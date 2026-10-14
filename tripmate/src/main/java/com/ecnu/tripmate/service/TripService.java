@@ -1,11 +1,14 @@
 package com.ecnu.tripmate.service;
 
+import com.ecnu.tripmate.model.dto.trip.TripPageRequest;
 import com.ecnu.tripmate.model.entity.User;
+import com.ecnu.tripmate.model.vo.trip.TripPageVO;
 import com.ecnu.tripmate.model.vo.trip.TripVO;
 import com.mybatisflex.core.service.IService;
 import com.ecnu.tripmate.model.entity.Trip;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 旅行表 服务层。
@@ -71,4 +74,12 @@ public interface TripService extends IService<Trip> {
      * @return
      */
     String getInitItineraryPrompt(Long tripId);
+
+    /**
+     * 分页获取旅行信息
+     * @param tripPageRequest 分页获取旅行信息请求
+     * @param loginUser 登录用户请求
+     * @return
+     */
+    List<TripPageVO> page(TripPageRequest tripPageRequest, User loginUser);
 }

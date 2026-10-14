@@ -62,4 +62,11 @@ public interface ItineraryService extends IService<Itinerary> {
      * @return
      */
     boolean delete(Long id);
+
+    /**
+     * 根据旅行id获取行程id
+     * @param tripId 旅行id
+     * @return
+     */
+    Long getIdByTripId(Long tripId);
 }

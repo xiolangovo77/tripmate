@@ -6,6 +6,7 @@ import com.mybatisflex.core.service.IService;
 import com.ecnu.tripmate.model.entity.TripMember;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 旅行成员表 服务层。
@@ -45,4 +46,11 @@ public interface TripMemberService extends IService<TripMember> {
      * @return
      */
     boolean update(long tripId, long userId, BigDecimal budgetLimit, String travelPace, String favoriteActivities, User loginuser);
+
+    /**
+     * 根据用户id获取已加入的旅游id列表
+     * @param userId
+     * @return
+     */
+    List<Long> getTripIdsByUserId(long userId);
 }

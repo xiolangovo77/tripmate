@@ -5,10 +5,12 @@ import com.ecnu.tripmate.common.ResultUtils;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.dto.trip.TripAddRequest;
+import com.ecnu.tripmate.model.dto.trip.TripPageRequest;
 import com.ecnu.tripmate.model.dto.trip.TripUpdateRequest;
 import com.ecnu.tripmate.model.dto.trip.TripUpdateStatusRequest;
 import com.ecnu.tripmate.model.dto.user.UserRegisterRequest;
 import com.ecnu.tripmate.model.entity.User;
+import com.ecnu.tripmate.model.vo.trip.TripPageVO;
 import com.ecnu.tripmate.model.vo.trip.TripVO;
 import com.ecnu.tripmate.service.UserService;
 import com.mybatisflex.core.paginate.Page;
@@ -121,5 +123,20 @@ public class TripController {
     public BaseResponse<String> getPrompt(@RequestParam long tripId){
         String initItineraryPrompt = tripService.getInitItineraryPrompt(tripId);
         return ResultUtils.success(initItineraryPrompt);
+    }
+
+    /**
+     * 分页获取旅行信息
+     * @param tripPageRequest 分页获取旅行信息请求
+     * @param request
+     * @return
+     */
+    @PostMapping("page")
+    public BaseResponse<List<TripPageVO>> page(@RequestBody TripPageRequest tripPageRequest, HttpServletRequest request){
+        // 获取用户登录信息
+        User loginUser = userService.getLoginUser(request);
+        // 获取传入参数
+        List<TripPageVO> tripPageVOList = tripService.page(tripPageRequest, loginUser);
+        return ResultUtils.success(tripPageVOList);
     }
 }

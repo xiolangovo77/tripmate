@@ -348,4 +348,22 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
         }
         return true;
     }
+
+    @Override
+    public Long getIdByTripId(Long tripId) {
+        // 1、参数校验
+        if(tripId <= 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不存在");
+        }
+        // 2、判断旅行是否存在
+        tripService.isTripExists(tripId);
+        // 3、查询数据库
+        QueryWrapper queryWrapper = new QueryWrapper();
+        queryWrapper.eq("tripId", tripId);
+        List<Itinerary> itineraries = this.mapper.selectListByQuery(queryWrapper);
+        if(itineraries == null || itineraries.isEmpty()){
+            return null;
+        }
+        return itineraries.getFirst().getId();
+    }
 }

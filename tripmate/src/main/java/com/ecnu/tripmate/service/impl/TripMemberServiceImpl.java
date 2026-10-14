@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 旅行成员表 服务层实现。
@@ -175,5 +176,24 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "更新状态失败，数据库错误");
         }
         return updateResult;
+    }
+
+    @Override
+    public List<Long> getTripIdsByUserId(long userId) {
+        // 1、参数校验
+        if(userId <= 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户id不合法");
+        }
+        // 2、查询数据库
+        QueryWrapper queryWrapper = new QueryWrapper();
+        queryWrapper.eq("userId", userId)
+                .eq("status", TripMemberStatusEnum.JOINED.getValue());
+        List<TripMember> tripMemberList = this.mapper.selectListByQuery(queryWrapper);
+        if(tripMemberList == null || tripMemberList.isEmpty()){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "该用户不存在旅行信息");
+        }
+        // 3、处理查询结果
+        List<Long> tripIds = tripMemberList.stream().map(TripMember::getTripId).toList();
+        return tripIds;
     }
 }
