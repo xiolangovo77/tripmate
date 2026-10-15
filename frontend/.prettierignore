@@ -1,0 +1,6 @@
+node_modules
+dist
+test-results
+package-lock.json
+src/styles/prototype.css
+src/assets
