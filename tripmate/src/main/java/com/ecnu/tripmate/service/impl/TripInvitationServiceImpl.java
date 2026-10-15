@@ -15,6 +15,7 @@ import com.ecnu.tripmate.model.entity.TripInvitation;
 import com.ecnu.tripmate.mapper.TripInvitationMapper;
 import com.ecnu.tripmate.service.TripInvitationService;
 import jakarta.annotation.Resource;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -30,6 +31,7 @@ import java.util.regex.Pattern;
 public class TripInvitationServiceImpl extends ServiceImpl<TripInvitationMapper, TripInvitation>  implements TripInvitationService{
 
     @Resource
+    @Lazy
     private TripService tripService;
 
     // 邀请码固定为 8 位大写字母和数字，生成时排除容易混淆的 0、1、I、O。

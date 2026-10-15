@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONUtil;
+import com.ecnu.tripmate.constant.UserConstant;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.dto.user.UserUpdateRequest;
@@ -124,7 +125,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
     }
 
     @Override
-    public boolean userUpdate(UserUpdateRequest userUpdateRequest, User loginUser) {
+    public boolean userUpdate(UserUpdateRequest userUpdateRequest, User loginUser, HttpServletRequest request) {
         // 1、获取参数
         String userAccount = userUpdateRequest.getUserAccount();
         String nickname = userUpdateRequest.getNickname();
@@ -173,6 +174,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
         if(!result){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "数据库错误，更新失败");
         }
+        // 7、更新session
+        request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, user);
         return result;
     }
 

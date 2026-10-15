@@ -9,6 +9,8 @@ import com.ecnu.tripmate.model.dto.tripMember.TripMemberAddRequest;
 import com.ecnu.tripmate.model.dto.tripMember.TripMemberUpdateRequest;
 import com.ecnu.tripmate.model.dto.tripMember.TripMemberUpdateStatusRequest;
 import com.ecnu.tripmate.model.entity.User;
+import com.ecnu.tripmate.model.enums.trip.TripMemberRoleEnum;
+import com.ecnu.tripmate.model.enums.trip.TripMemberStatusEnum;
 import com.ecnu.tripmate.service.UserService;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
@@ -103,9 +105,10 @@ public class TripMemberController {
         User loginUser = userService.getLoginUser(request);
         // 获取传入参数
         long tripId = tripMemberAddRequest.getTripId();
+        String role = TripMemberRoleEnum.MEMBER.getValue();
         BigDecimal budgetLimit = tripMemberAddRequest.getBudgetLimit();
-        String role = tripMemberAddRequest.getRole();
-        long tripMemberId = tripMemberService.add(tripId, role, loginUser, budgetLimit);
+        String inviteCode = tripMemberAddRequest.getInviteCode();
+        long tripMemberId = tripMemberService.add(tripId, role, inviteCode, loginUser, budgetLimit);
         return ResultUtils.success(tripMemberId);
     }
 }

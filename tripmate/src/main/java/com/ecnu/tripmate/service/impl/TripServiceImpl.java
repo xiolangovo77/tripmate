@@ -70,7 +70,7 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "加入旅行失败，数据库错误");
         }
         // 4、同步插入trip_member表
-        tripMemberService.add(trip.getId(), TripMemberRoleEnum.OWNER.getValue(),loginuser, budgetLimit);
+        tripMemberService.add(trip.getId(), TripMemberRoleEnum.OWNER.getValue(), null, loginuser, budgetLimit);
         return trip.getId();
     }
 

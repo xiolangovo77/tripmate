@@ -2,6 +2,7 @@ package com.ecnu.tripmate.controller;
 
 import com.ecnu.tripmate.common.BaseResponse;
 import com.ecnu.tripmate.common.ResultUtils;
+import com.ecnu.tripmate.constant.UserConstant;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.exception.ThrowUtils;
@@ -12,11 +13,8 @@ import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.user.LoginUserVO;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 import com.ecnu.tripmate.service.UserService;
-import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 用户表 控制层。
@@ -75,14 +73,31 @@ public class UserController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        boolean result = userService.userUpdate(userUpdateRequest, loginUser);
+        boolean result = userService.userUpdate(userUpdateRequest, loginUser, request);
         return ResultUtils.success(result);
     }
 
+    /**
+     * 用户退出
+     * @param request
+     * @return
+     */
     @PostMapping("/logout")
     public BaseResponse<Boolean> userLogout(HttpServletRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
         boolean result = userService.userLogout(request);
         return ResultUtils.success(result);
+    }
+
+    /**
+     * 获取用户登录信息
+     * @param request
+     * @return
+     */
+    @GetMapping("get")
+    public BaseResponse<LoginUserVO> get(HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        LoginUserVO loginUserVO = userService.getLoginUserVO(loginUser);
+        return ResultUtils.success(loginUserVO);
     }
 }

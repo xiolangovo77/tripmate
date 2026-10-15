@@ -50,7 +50,7 @@ public interface UserService extends IService<User> {
      * @param userUpdateRequest 用户信息请求
      * @return
      */
-    boolean userUpdate(UserUpdateRequest userUpdateRequest, User loginUser);
+    boolean userUpdate(UserUpdateRequest userUpdateRequest, User loginUser, HttpServletRequest request);
 
     /**
      * 获取当前登录用户

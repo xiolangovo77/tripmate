@@ -19,11 +19,12 @@ public interface TripMemberService extends IService<TripMember> {
      * 加入成员信息
      * @param tripId 旅行id
      * @param role 成员角色
+     * @param inviteCode 邀请码
      * @param logiguser 成员信息
      * @param budgetLimit 成员旅行预算
      * @return
      */
-    Long add(long tripId, String role, User logiguser, BigDecimal budgetLimit);
+    Long add(long tripId, String role, String inviteCode, User logiguser, BigDecimal budgetLimit);
 
     /**
      * 修改旅行成员状态

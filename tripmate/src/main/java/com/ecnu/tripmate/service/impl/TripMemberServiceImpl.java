@@ -10,6 +10,7 @@ import com.ecnu.tripmate.model.enums.TravelPaceEnum;
 import com.ecnu.tripmate.model.enums.trip.TripMemberRoleEnum;
 import com.ecnu.tripmate.model.enums.trip.TripMemberStatusEnum;
 import com.ecnu.tripmate.model.enums.trip.TripStatusEnum;
+import com.ecnu.tripmate.service.TripInvitationService;
 import com.ecnu.tripmate.service.TripService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -37,8 +38,11 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
     @Lazy
     private TripService tripService;
 
+    @Resource
+    private TripInvitationService tripInvitationService;
+
     @Override
-    public Long add(long tripId, String role, User logiguser, BigDecimal budgetLimit) {
+    public Long add(long tripId, String role, String inviteCode, User logiguser, BigDecimal budgetLimit) {
         // 1、校验参数
         if(tripId <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
@@ -61,6 +65,9 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
             if(count > 0){
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "该旅行已存在发起人");
             }
+        }else{
+            // 如果是普通成员需要检验邀请码
+            tripInvitationService.checkInviteCode(tripId, inviteCode);
         }
         // 4、是否重复加入旅行
         QueryWrapper queryWrapper1 = new QueryWrapper();

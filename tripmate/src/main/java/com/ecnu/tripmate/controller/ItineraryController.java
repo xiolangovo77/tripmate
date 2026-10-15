@@ -95,4 +95,16 @@ public class ItineraryController {
         Long updateResult = itineraryService.update(id, messageList, loginUser);
         return ResultUtils.success(updateResult);
     }
+
+    /**
+     * 根据旅行id获取行程id
+     * @param tripId 旅行id
+     * @return
+     */
+    @GetMapping("getIdByTripId")
+    public BaseResponse<Long> getIdByTripId(@RequestParam Long tripId){
+        // 获取传入参数
+        Long id = itineraryService.getIdByTripId(tripId);
+        return ResultUtils.success(id);
+    }
 }

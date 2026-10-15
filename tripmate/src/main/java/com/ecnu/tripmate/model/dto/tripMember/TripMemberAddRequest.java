@@ -24,8 +24,8 @@ public class TripMemberAddRequest implements Serializable {
     private BigDecimal budgetLimit;
 
     /**
-     * 成员角色：发起人、普通成员
+     * 区分大小写的唯一随机邀请码
      */
-    private String role;
+    private String inviteCode;
 }
 
