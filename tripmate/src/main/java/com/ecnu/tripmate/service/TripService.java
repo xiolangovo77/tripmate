@@ -1,6 +1,6 @@
 package com.ecnu.tripmate.service;
 
-import com.ecnu.tripmate.model.dto.trip.TripPageRequest;
+import com.ecnu.tripmate.model.dto.trip.*;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.trip.TripPageVO;
 import com.ecnu.tripmate.model.vo.trip.TripVO;
@@ -19,13 +19,11 @@ public interface TripService extends IService<Trip> {
 
     /**
      * 创建旅行
-     * @param destination 目的地
-     * @param travelDays 旅行天数
-     * @param budgetLimit 发起人预算
+     * @param request 旅行路线、日期及预算
      * @param loginuser 登录用户信息
      * @return 旅行id
      */
-    Long addTrip(String destination, Integer travelDays, BigDecimal budgetLimit, User loginuser);
+    Long addTrip(TripAddRequest request, User loginuser);
 
     /**
      * 更新旅行状态
@@ -38,13 +36,11 @@ public interface TripService extends IService<Trip> {
 
     /**
      * 更新旅行信息
-     * @param title 旅行标题
-     * @param destination 目的地
-     * @param travelDays 旅行天数
+     * @param request 旅行标题、路线与日期
      * @param loginuser 登录用户信息
      * @return
      */
-    boolean update(long tripId, String title, String destination, Integer travelDays, User loginuser);
+    boolean update(TripUpdateRequest request, User loginuser);
 
     /**
      * 判断旅行是否存在

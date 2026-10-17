@@ -1434,3 +1434,21 @@ button:disabled:hover {
     scroll-behavior: auto !important;
   }
 }
+
+/* 往返日期表单 */
+.create-fields {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.create-fields > .schedule-fields {
+  grid-column: 1 / -1;
+}
+@media (max-width: 600px) {
+  .create-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.day-tabs small {
+  display: block;
+  font-size: 10px;
+  margin-top: 4px;
+}

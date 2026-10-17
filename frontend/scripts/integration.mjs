@@ -71,7 +71,15 @@ try {
   const tripId = await step('创建旅行，Long ID 无精度损失', async () =>
     asId(
       await owner('/trip/add', {
-        body: { destination: '杭州', travelDays: 2, budgetLimit: '800' },
+        body: {
+          destination: '杭州',
+          departureLocation: '上海',
+          departureDate: '2027-04-01',
+          returnDate: '2027-04-02',
+          departurePeriod: 'morning',
+          returnPeriod: 'evening',
+          budgetLimit: '800',
+        },
       }),
     ),
   )
@@ -154,7 +162,15 @@ try {
     assert.equal(current.travelPace, 'relaxed')
     const createdId = asId(
       await guest('/trip/add', {
-        body: { destination: '苏州', travelDays: 1, budgetLimit: '400' },
+        body: {
+          destination: '苏州',
+          departureLocation: '上海',
+          departureDate: '2027-04-01',
+          returnDate: '2027-04-01',
+          departurePeriod: 'morning',
+          returnPeriod: 'evening',
+          budgetLimit: '400',
+        },
       }),
     )
     const created = await guest('/trip/get', { method: 'GET', query: { tripId: createdId } })
@@ -165,7 +181,16 @@ try {
     assert.equal(
       (
         await guest('/trip/update', {
-          body: { id: tripId, title: '不应修改', destination: '杭州', travelDays: 2 },
+          body: {
+            id: tripId,
+            title: '不应修改',
+            destination: '杭州',
+            departureLocation: '上海',
+            departureDate: '2027-04-01',
+            returnDate: '2027-04-02',
+            departurePeriod: 'morning',
+            returnPeriod: 'evening',
+          },
           allowError: true,
         })
       ).code,

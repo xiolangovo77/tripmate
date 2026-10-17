@@ -1,4 +1,5 @@
 <script setup>
+import { scheduleLabel, routeLabel } from '../utils/tripSchedule.js'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { invitationApi } from '../api/invitation.js'
@@ -150,10 +151,11 @@ watch(
         </div>
         <div class="invitation-facts">
           <div>
-            <span>目的地</span><strong>{{ trip.destination }}</strong>
+            <span>旅行路线</span><strong>{{ routeLabel(trip) }}</strong>
           </div>
           <div>
-            <span>旅行时长</span><strong>{{ trip.travelDays }} 天</strong>
+            <span>出行日期</span
+            ><strong>{{ scheduleLabel(trip) }} · {{ trip.travelDays }} 天</strong>
           </div>
           <div>
             <span>发起人</span><strong>{{ owner?.nickname || '旅行发起人' }}</strong>

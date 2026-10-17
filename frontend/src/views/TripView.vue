@@ -1,4 +1,12 @@
 <script setup>
+import TripScheduleFields from '../components/TripScheduleFields.vue'
+import {
+  emptySchedule,
+  scheduleError,
+  schedulePayload,
+  scheduleLabel,
+  routeLabel,
+} from '../utils/tripSchedule.js'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tripApi, memberApi } from '../api/trip.js'
@@ -28,7 +36,7 @@ const busy = ref(false)
 const actionError = ref('')
 const leaveError = ref('')
 const cancelled = ref(false)
-const edit = reactive({ title: '', destination: '', travelDays: 1 })
+const edit = reactive({ title: '', ...emptySchedule() })
 const preference = reactive({ budgetLimit: '', travelPace: 'balanced', activities: [] })
 const budgetRange = computed(() => {
   const budgets = (trip.value?.tripMembers || [])
@@ -41,8 +49,9 @@ const budgetRange = computed(() => {
 function openEdit() {
   Object.assign(edit, {
     title: trip.value.title,
-    destination: trip.value.destination,
-    travelDays: trip.value.travelDays,
+    ...Object.fromEntries(
+      Object.keys(emptySchedule()).map((key) => [key, trip.value[key] ?? emptySchedule()[key]]),
+    ),
   })
   actionError.value = ''
   editOpen.value = true
@@ -59,6 +68,7 @@ function openPreference() {
 async function save(kind) {
   if (busy.value) return
   actionError.value = ''
+  if (kind === 'trip' && (actionError.value = scheduleError(edit))) return
   if (kind === 'preference' && !preference.activities.length) {
     actionError.value = '请至少选择一项活动偏好'
     return
@@ -69,8 +79,7 @@ async function save(kind) {
       await tripApi.update({
         id: tripId.value,
         title: edit.title.trim(),
-        destination: edit.destination.trim(),
-        travelDays: Number(edit.travelDays),
+        ...schedulePayload(edit),
       })
     else
       await memberApi.update({
@@ -141,10 +150,11 @@ onMounted(load)
     <h1 class="h2">{{ trip?.title || '我们的旅行房间' }}</h1>
     <p class="muted">
       {{
-        trip ? `${trip.destination} · ${trip.travelDays} 天` : '先约好同行的人，再慢慢商量路线。'
+        trip ? `${routeLabel(trip)} · ${trip.travelDays} 天` : '先约好同行的人，再慢慢商量路线。'
       }}
       <span v-if="trip">· 一起把想法变成计划</span>
     </p>
+    <p v-if="trip" class="muted tiny">{{ scheduleLabel(trip) }}</p>
     <TripNavigation :trip-id="tripId" />
   </div>
   <AsyncState :loading="loading" :error="error" @retry="load"
@@ -190,7 +200,7 @@ onMounted(load)
           <div class="mt">
             <span class="badge">✦ 这次的目的地</span>
             <h2 class="h2">给期待一个方向。</h2>
-            <p class="muted">{{ trip.destination }} · {{ trip.travelDays }} 天</p>
+            <p class="muted">{{ routeLabel(trip) }} · {{ trip.travelDays }} 天</p>
           </div>
           <div class="summary-data">
             <div>
@@ -228,26 +238,19 @@ onMounted(load)
     ><form class="stack" @submit.prevent="save('trip')">
       <div>
         <label class="label" for="edit-title">旅行名称</label
-        ><input id="edit-title" v-model="edit.title" class="field" required maxlength="100" />
-      </div>
-      <div>
-        <label class="label" for="edit-city">目的地</label
-        ><input id="edit-city" v-model="edit.destination" class="field" required maxlength="100" />
-      </div>
-      <div>
-        <label class="label" for="edit-days">旅行天数</label
         ><input
-          id="edit-days"
-          v-model="edit.travelDays"
-          type="number"
-          min="1"
-          max="365"
-          step="1"
+          id="edit-title"
+          v-model="edit.title"
           class="field"
           required
+          maxlength="120"
+          :disabled="busy"
         />
       </div>
-      <p class="tiny muted">修改基本信息不会自动重写已有行程，可在群聊中 @AI 提出调整。</p>
+      <TripScheduleFields :model-value="edit" prefix="edit" :disabled="busy || trip.hasItinerary" />
+      <p v-if="trip.hasItinerary" class="tiny muted">
+        已有行程，路线和出行日期、时段已锁定。如需更换请新建旅行重新规划；仍可修改旅行名称。
+      </p>
       <p v-if="actionError" class="err" role="alert">{{ actionError }}</p>
       <button class="btn" :disabled="busy">{{ busy ? '保存中…' : '保存旅行信息' }}</button>
     </form></ModalDialog

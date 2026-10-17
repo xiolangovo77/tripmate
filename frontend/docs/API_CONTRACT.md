@@ -1,6 +1,6 @@
 # 接口契约与后端限制
 
-核对依据：工作区 `后端接口文档.md`，以及当前 `tripmate/src/main/java/com/ecnu/tripmate` 下的 Controller、DTO、VO、Enum、ServiceImpl。接口前缀统一 `/api`。以下均按当前 Java 实现处理，未修改后端。
+核对依据：工作区 `后端接口文档.md`，以及当前 `tripmate/src/main/java/com/ecnu/tripmate` 下的 Controller、DTO、VO、Enum、ServiceImpl。接口前缀统一 `/api`。本次已同步修改后端和前端，以下以当前 Java 实现为准。
 
 当前用户查询：GET `/user/get`，无参数，返回 Session 对应的 LoginUserVO，未登录返回 40100。
 
@@ -8,34 +8,34 @@
 
 ## 页面到 API 的映射
 
-| 操作        | HTTP 与地址（省略 /api）                    | 参数与响应                                                                                                |
-| ----------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| 注册        | POST `/user/register`                       | JSON：userAccount、userPassword、checkPassword；返回 Long                                                 |
-| 登录        | POST `/user/login`                          | JSON：userAccount、userPassword；返回 LoginUserVO，并写入 Session                                         |
-| 退出        | POST `/user/logout`                         | 无请求体；返回 boolean                                                                                    |
-| 资料与偏好  | POST `/user/update`                         | JSON：userAccount、nickname、avatarUrl、travelPace、favoriteActivities；返回 boolean                      |
-| 创建旅行    | POST `/trip/add`                            | JSON：destination、travelDays、budgetLimit；返回 tripId                                                   |
-| 旅行列表    | POST `/trip/page`                           | JSON：pageNum、pageSize、可选 title/destination/travelDays/status/beginTime/endTime；返回数组，没有总条数 |
-| 旅行详情    | GET `/trip/get`                             | Query：tripId；返回 ownerId、title、destination、travelDays、tripMembers                                  |
-| 旅行修改    | POST `/trip/update`                         | JSON：id、title、destination、travelDays；仅发起人                                                        |
-| 本次偏好    | POST `/tripMember/update`                   | JSON：tripId、userId、budgetLimit、travelPace、favoriteActivities；仅本人                                 |
-| 退出旅行    | POST `/tripMember/updateStatus`             | JSON：tripId、userId、status=left；仅本人                                                                 |
-| 创建邀请    | POST `/tripInvitation/add`                  | JSON：tripId、inviteCode；返回邀请记录 ID；旧 active 邀请被撤销                                           |
-| 当前邀请    | GET `/tripInvitation/getById`               | Query：tripId；返回 inviteCode、expiresTime，无 status                                                    |
-| 验证邀请    | POST `/tripInvitation/check`                | JSON：tripId、inviteCode；返回 boolean；无需登录                                                          |
-| 撤销邀请    | POST `/tripInvitation/updateStatus`         | JSON：tripId、inviteCode、status=revoked                                                                  |
-| 加入旅行    | POST `/tripMember/add`                      | JSON：tripId、inviteCode、budgetLimit；后端固定 member 角色                                               |
-| 历史消息    | GET `/tripMessage/page`                     | Query：tripId、pageSize=30、可选 lastCreateTime；返回数组                                                 |
-| 普通消息    | POST `/tripMessage/add`                     | JSON：tripId、content；不回复时省略 replyToId；返回用户消息 ID                                            |
-| AI 回复     | POST `/tripMessage/addAi`                   | JSON：tripId、replyToId=用户消息 ID；返回字符串，并在后端保存 AI 消息                                     |
-| AI 建议列表 | POST `/tripMessage/getAiByChangeStatus`     | JSON：tripId、changeStatus；仅发起人，返回 id/content/createTime                                          |
-| 忽略建议    | POST `/tripMessage/updateChangeStatusByIds` | JSON：tripId、ids、changeStatus=ignored；返回更新数量                                                     |
-| 生成上下文  | GET `/trip/getPrompt`                       | Query：tripId；返回后端综合的旅行/成员提示词                                                              |
-| 生成行程    | POST `/itinerary/add`                       | JSON：tripId、initItineraryPrompt；仅发起人；返回行程 ID                                                  |
-| 查找行程 ID | GET `/itinerary/getIdByTripId`              | Query：tripId；不存在行程时返回 null                                                                      |
-| 行程详情    | GET `/itinerary/get`                        | Query：id；返回 ItineraryVO 和 itineraryItemVOList，无行程自身 ID                                         |
-| 采纳并修改  | PUT `/itinerary/update`                     | JSON：id、messageList（AI 消息原文）；返回新行程 ID                                                       |
-| 确认行程    | PUT `/itinerary/confirmed`                  | **Query：id**，无 JSON 请求体；返回更新条数                                                               |
+| 操作        | HTTP 与地址（省略 /api）                    | 参数与响应                                                                                                                                           |
+| ----------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 注册        | POST `/user/register`                       | JSON：userAccount、userPassword、checkPassword；返回 Long                                                                                            |
+| 登录        | POST `/user/login`                          | JSON：userAccount、userPassword；返回 LoginUserVO，并写入 Session                                                                                    |
+| 退出        | POST `/user/logout`                         | 无请求体；返回 boolean                                                                                                                               |
+| 资料与偏好  | POST `/user/update`                         | JSON：userAccount、nickname、avatarUrl、travelPace、favoriteActivities；返回 boolean                                                                 |
+| 创建旅行    | POST `/trip/add`                            | JSON：departureLocation、destination、departureDate、departurePeriod、returnDate、returnPeriod、budgetLimit；返回 tripId                             |
+| 旅行列表    | POST `/trip/page`                           | JSON：pageNum、pageSize、可选 title/departureLocation/destination/departureDate/returnDate/travelDays/status/beginTime/endTime；返回数组，没有总条数 |
+| 旅行详情    | GET `/trip/get`                             | Query：tripId；返回 ownerId、title、六个路线日期字段、travelDays、status、hasItinerary、tripMembers                                                  |
+| 旅行修改    | POST `/trip/update`                         | JSON：id、title、六个路线日期字段；仅发起人                                                                                                          |
+| 本次偏好    | POST `/tripMember/update`                   | JSON：tripId、userId、budgetLimit、travelPace、favoriteActivities；仅本人                                                                            |
+| 退出旅行    | POST `/tripMember/updateStatus`             | JSON：tripId、userId、status=left；仅本人                                                                                                            |
+| 创建邀请    | POST `/tripInvitation/add`                  | JSON：tripId、inviteCode；返回邀请记录 ID；旧 active 邀请被撤销                                                                                      |
+| 当前邀请    | GET `/tripInvitation/getById`               | Query：tripId；返回 inviteCode、expiresTime，无 status                                                                                               |
+| 验证邀请    | POST `/tripInvitation/check`                | JSON：tripId、inviteCode；返回 boolean；无需登录                                                                                                     |
+| 撤销邀请    | POST `/tripInvitation/updateStatus`         | JSON：tripId、inviteCode、status=revoked                                                                                                             |
+| 加入旅行    | POST `/tripMember/add`                      | JSON：tripId、inviteCode、budgetLimit；后端固定 member 角色                                                                                          |
+| 历史消息    | GET `/tripMessage/page`                     | Query：tripId、pageSize=30、可选 lastCreateTime；返回数组                                                                                            |
+| 普通消息    | POST `/tripMessage/add`                     | JSON：tripId、content；不回复时省略 replyToId；返回用户消息 ID                                                                                       |
+| AI 回复     | POST `/tripMessage/addAi`                   | JSON：tripId、replyToId=用户消息 ID；返回字符串，并在后端保存 AI 消息                                                                                |
+| AI 建议列表 | POST `/tripMessage/getAiByChangeStatus`     | JSON：tripId、changeStatus；仅发起人，返回 id/content/createTime                                                                                     |
+| 忽略建议    | POST `/tripMessage/updateChangeStatusByIds` | JSON：tripId、ids、changeStatus=ignored；返回更新数量                                                                                                |
+| 生成上下文  | GET `/trip/getPrompt`                       | Query：tripId；返回后端综合的旅行/成员提示词                                                                                                         |
+| 生成行程    | POST `/itinerary/add`                       | JSON：tripId、initItineraryPrompt；仅发起人；返回行程 ID                                                                                             |
+| 查找行程 ID | GET `/itinerary/getIdByTripId`              | Query：tripId；不存在行程时返回 null                                                                                                                 |
+| 行程详情    | GET `/itinerary/get`                        | Query：id；返回 ItineraryVO 和 itineraryItemVOList，无行程自身 ID                                                                                    |
+| 采纳并修改  | PUT `/itinerary/update`                     | JSON：id、messageList（AI 消息原文）；返回新行程 ID                                                                                                  |
+| 确认行程    | PUT `/itinerary/confirmed`                  | **Query：id**，无 JSON 请求体；返回更新条数                                                                                                          |
 
 ## 枚举与参数
 
@@ -88,7 +88,7 @@ addAi、行程生成和修改没有幂等键。长请求超时后结果不确定
 
 `updateChangeStatusByIds` 中对 applied/ignored 的校验表达式使用同一字符串同时等于两个值的 AND，无法表达预期限制。前端只用 ignored；applied 完全交给 itinerary/update 的事务处理。
 
-确认行程接口只更新 itinerary，不更新 trip.status。按当前产品要求，前端在 `/itinerary/add` 成功返回有效 ID 后，调用 `/trip/updateStatus` 将旅行设为 confirmed；状态更新失败时保留行程，只重试状态请求。行程本身仍为草案，最终确认沿用 `/itinerary/confirmed`。TripVO/TripPageVO 没有 status 字段，详情不推断旅行状态，列表可按状态筛选核对。
+确认行程接口只更新 itinerary，不更新 trip.status。按当前产品要求，前端在 `/itinerary/add` 成功返回有效 ID 后，调用 `/trip/updateStatus` 将旅行设为 confirmed；状态更新失败时保留行程，只重试状态请求。行程本身仍为草案，最终确认沿用 `/itinerary/confirmed`。TripVO/TripPageVO 现在返回 status 字段，列表可按状态筛选核对。
 
 创建行程/确认旅行以及取消旅行/退出成员均由两个独立 HTTP 请求完成，无法保证事务原子性；前端在当前页面保留部分成功提示和定向重试。旅行变为 confirmed 或 cancelled 后，后端邀请校验会拒绝后续加入，生成入口已提示先邀请好伙伴。
 
@@ -99,3 +99,14 @@ addAi、行程生成和修改没有幂等键。长请求超时后结果不确定
 响应在 Axios transformResponse 中使用 lossless-json，防止原生 JSON.parse 提前损失 Long 精度。ID 字段统一转为字符串；所有 DTO 中 Long 参数传字符串；不会把雪花 ID 转成 Number。接口联调已验证 Jackson 接受这些字符串 Long。
 
 业务 `40100` 清除登录态并处理返回地址，`40101`/`40300` 展示错误；网络、HTTP 状态、超时和响应格式异常统一处理。boolean=false、更新数量不符以及无效创建 ID 都不展示成功。
+
+## 2026-10-17：出发地与往返日期契约
+
+- 六个字段：`departureLocation`、`destination`、`departureDate`、`departurePeriod`、`returnDate`、`returnPeriod`。创建及编辑不再接受手填天数；`travelDays` 仍在实体与返回值中，由服务端按自然日差加一计算。
+- 日期使用 `LocalDate` / `DATE`，JSON 为 `yyyy-MM-dd`；返回日期指到达出发地的日期。时段使用 `morning` / `afternoon` / `evening` / `flexible`，省略或 null 默认 flexible，非法值拒绝。
+- 出发地、目的地与标题最多120字符。日期必填，返回不能早于出发；同日指定时段不能倒置。最多65535天，与数据库 SMALLINT UNSIGNED 上限一致。过往日期仍可用于历史旅行。
+- `/trip/page` 新增出发地模糊匹配和出发/返回日期精确匹配，原天数、创建时间筛选仍可使用。
+- `/trip/get` 新增 `hasItinerary`。已有行程时服务端拒绝直接改变城市、往返日期或时段，前端锁定这些输入；标题可单独修改。更换日期或路线需新建旅行重新规划。
+- 生成行程时服务端重新读取保存的旅行和成员信息，不信任客户端传回的旧提示词；现有 `initItineraryPrompt` 请求字段暂时保留兼容。修改行程时同样补入当前路线、日期、时段和成员信息。AI 返回越界 dayNumber 时拒绝持久化。
+- 行程页按 `departureDate + dayNumber - 1` 展示实际日期，所有日期运算均使用日历日，不受浏览器时区/DST影响。
+- 现有数据库需先增加新列；`CREATE TABLE IF NOT EXISTS` 不会升级旧表。旧表迁移参考 `sql/alter_trip_schedule.sql`，历史真实日期需补齐后再收紧非空约束。已按新表建好的数据库无需重复 ALTER。本次没有执行数据库迁移。

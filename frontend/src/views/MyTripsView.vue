@@ -1,4 +1,5 @@
 <script setup>
+import { scheduleLabel, routeLabel } from '../utils/tripSchedule.js'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
@@ -33,6 +34,9 @@ const size = 6
 const filters = reactive({
   title: '',
   destination: '',
+  departureLocation: '',
+  departureDate: '',
+  returnDate: '',
   travelDays: '',
   status: '',
   beginTime: '',
@@ -191,6 +195,28 @@ onMounted(() => load())
           />
         </div>
         <div>
+          <label class="label" for="filter-origin">出发地</label
+          ><input
+            id="filter-origin"
+            v-model.trim="filters.departureLocation"
+            class="field"
+            placeholder="全部出发地"
+          />
+        </div>
+        <div>
+          <label class="label" for="filter-departure-date">出发日期</label
+          ><input
+            id="filter-departure-date"
+            v-model="filters.departureDate"
+            type="date"
+            class="field"
+          />
+        </div>
+        <div>
+          <label class="label" for="filter-return-date">返回日期</label
+          ><input id="filter-return-date" v-model="filters.returnDate" type="date" class="field" />
+        </div>
+        <div>
           <label class="label" for="filter-days">天数</label
           ><input
             id="filter-days"
@@ -260,7 +286,7 @@ onMounted(() => load())
             class="trip-card-art"
             :to="`/trips/${trip.id}${route.query.pick === 'itinerary' ? '/itinerary' : ''}`"
             :aria-label="`继续规划${trip.title}`"
-            ><span class="trip-card-destination">{{ trip.destination }}</span
+            ><span class="trip-card-destination">{{ routeLabel(trip) }}</span
             ><span class="trip-card-days">{{ trip.travelDays }}<small> DAYS</small></span
             ><span class="trip-card-path" aria-hidden="true">↗</span></RouterLink
           >
@@ -269,7 +295,8 @@ onMounted(() => load())
               <div>
                 <h3 class="h2">{{ trip.title }}</h3>
                 <p class="muted tiny">
-                  {{ trip.destination }} · {{ trip.travelDays }} 天 · 创建于
+                  {{ routeLabel(trip) }} · {{ trip.travelDays }} 天 · {{ scheduleLabel(trip) }} ·
+                  创建于
                   {{ dateTime(trip.createTime) }}
                 </p>
               </div>

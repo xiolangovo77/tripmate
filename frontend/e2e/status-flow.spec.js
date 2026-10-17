@@ -35,6 +35,11 @@ async function fixture(
           ownerId: '101',
           title: '杭州同行',
           destination: '杭州',
+          departureLocation: '上海',
+          departureDate: '2027-04-01',
+          returnDate: '2027-04-02',
+          departurePeriod: 'morning',
+          returnPeriod: 'evening',
           travelDays: 2,
           tripMembers: members,
         }

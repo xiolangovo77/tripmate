@@ -4,11 +4,19 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { tripApi } from '../api/trip.js'
 import { asId } from '../utils/json.js'
+import TripScheduleFields from '../components/TripScheduleFields.vue'
+import {
+  emptySchedule,
+  travelDays,
+  scheduleError,
+  schedulePayload,
+  dayDate,
+} from '../utils/tripSchedule.js'
 import landscape from '../assets/landscape.svg'
 const auth = useAuthStore()
 const router = useRouter()
-const draftKey = 'tripmate.create-draft.v1'
-const form = reactive({ destination: '', travelDays: 2, budgetLimit: '' })
+const draftKey = 'tripmate.create-draft.v2'
+const form = reactive({ ...emptySchedule(), budgetLimit: '' })
 try {
   const draft = JSON.parse(sessionStorage.getItem(draftKey) || 'null')
   if (draft && typeof draft === 'object') {
@@ -27,12 +35,14 @@ watch(form, () => {
 })
 const busy = ref(false)
 const error = ref('')
-const cityInput = ref(null)
 const ready = computed(
   () =>
-    [form.destination.trim(), Number(form.travelDays) > 0, Number(form.budgetLimit) > 0].filter(
-      Boolean,
-    ).length,
+    [
+      form.departureLocation.trim(),
+      form.destination.trim(),
+      travelDays(form) > 0,
+      Number(form.budgetLimit) > 0,
+    ].filter(Boolean).length,
 )
 const inspirations = [
   {
@@ -64,20 +74,18 @@ const inspirations = [
   },
 ]
 function useIdea(idea) {
-  Object.assign(form, { destination: idea.city, travelDays: idea.days, budgetLimit: idea.budget })
-  cityInput.value?.focus({ preventScroll: true })
-  document
-    .getElementById('create')
-    ?.scrollIntoView({
-      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
-      block: 'center',
-    })
+  Object.assign(form, { destination: idea.city, budgetLimit: idea.budget })
+  if (form.departureDate) form.returnDate = dayDate(form.departureDate, idea.days)
+  document.getElementById('create-origin')?.focus({ preventScroll: true })
+  document.getElementById('create')?.scrollIntoView({
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    block: 'center',
+  })
 }
 async function create() {
   if (busy.value) return
-  if (!form.destination.trim()) {
-    error.value = '先填一个想去的目的地吧'
-    cityInput.value?.focus()
+  error.value = scheduleError(form)
+  if (error.value) {
     return
   }
   if (!auth.user) {
@@ -89,8 +97,7 @@ async function create() {
   try {
     const id = asId(
       await tripApi.create({
-        destination: form.destination.trim(),
-        travelDays: Number(form.travelDays),
+        ...schedulePayload(form),
         budgetLimit: form.budgetLimit,
       }),
     )
@@ -144,38 +151,14 @@ async function create() {
         <h2 class="h3">下一站，想去哪里？</h2>
       </div>
       <span class="completion-indicator"
-        >{{ ready }} / 3 项已填写 <span v-for="n in 3" :key="n" :class="{ filled: ready >= n }"
+        >{{ ready }} / 4 项已填写 <span v-for="n in 4" :key="n" :class="{ filled: ready >= n }"
       /></span>
     </div>
     <form @submit.prevent="create">
       <fieldset class="create-fields" :disabled="busy">
-        <div class="destination-field">
-          <label class="label" for="city"><span>01</span> 这次想去哪里？</label
-          ><input
-            id="city"
-            ref="cityInput"
-            v-model="form.destination"
-            class="field"
-            placeholder="一座城市，一场新故事"
-            maxlength="100"
-            required
-          />
-        </div>
+        <TripScheduleFields :model-value="form" prefix="create" />
         <div>
-          <label class="label" for="days"><span>02</span> 计划玩几天？</label
-          ><input
-            id="days"
-            v-model="form.travelDays"
-            class="field"
-            type="number"
-            min="1"
-            step="1"
-            max="365"
-            required
-          />
-        </div>
-        <div>
-          <label class="label" for="budget"><span>03</span> 每人预算（元）</label
+          <label class="label" for="budget">每人预算（元）</label
           ><input
             id="budget"
             v-model="form.budgetLimit"
@@ -207,7 +190,7 @@ async function create() {
         <span class="eyebrow">A little inspiration</span>
         <h2 class="h2">没想好？从这些小念头开始。</h2>
       </div>
-      <span class="tiny muted">灵感预填，可随时调整</span>
+      <span class="tiny muted">灵感预填，日期由你决定</span>
     </div>
     <div class="inspiration-grid">
       <button

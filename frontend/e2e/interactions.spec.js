@@ -13,7 +13,10 @@ test('真实服务：创建草稿、筛选、聊天快捷键、刷新保留输�
   await page.goto('/')
   await page.getByRole('button', { name: /苏州.*在小巷里慢下来/ }).click()
   await expect(page.getByLabel('这次想去哪里')).toHaveValue('苏州')
-  await expect(page.getByLabel('计划玩几天')).toHaveValue('3')
+  await page.getByLabel('从哪里出发').fill('上海')
+  await page.getByLabel('出发日期', { exact: true }).fill('2027-04-01')
+  await page.getByLabel('返回日期', { exact: true }).fill('2027-04-03')
+  await expect(page.getByText('共 3 天，含出发和返回当天。', { exact: false })).toBeVisible()
   await expect(page.getByLabel('每人预算')).toHaveValue('1200')
   await page.getByLabel('每人预算').fill('1500')
   await page.getByRole('button', { name: '登录并开始旅行' }).click()
@@ -27,7 +30,7 @@ test('真实服务：创建草稿、筛选、聊天快捷键、刷新保留输�
   await page.getByRole('button', { name: '开始我们的旅行' }).click()
   await expect(page.getByRole('heading', { name: /旅行小队/ })).toBeVisible()
   const roomUrl = page.url()
-  expect(await page.evaluate(() => sessionStorage.getItem('tripmate.create-draft.v1'))).toBeNull()
+  expect(await page.evaluate(() => sessionStorage.getItem('tripmate.create-draft.v2'))).toBeNull()
   const composer = page.getByLabel('说说你的想法')
   await composer.fill('刷新也不会丢掉的想法')
   await page.getByRole('button', { name: '刷新成员' }).click()
@@ -81,7 +84,10 @@ test('真实服务：创建草稿、筛选、聊天快捷键、刷新保留输�
   await page.goto(roomUrl)
   await page.getByRole('button', { name: '邀请朋友' }).click()
   await page.getByRole('button', { name: '撤销邀请', exact: true }).click()
-  await page.screenshot({ path: testInfo.outputPath('confirmation-mobile.png'), animations: 'disabled' })
+  await page.screenshot({
+    path: testInfo.outputPath('confirmation-mobile.png'),
+    animations: 'disabled',
+  })
   await page.getByRole('button', { name: '先等等' }).click()
   await page.getByRole('button', { name: '关闭弹窗' }).click()
   const leaving = []
@@ -112,6 +118,11 @@ test('行程展示夹具：按天切换、确认与移动端布局（不调用 A
     ownerId: '101',
     title: '苏州 · 留一点时间给生活',
     destination: '苏州',
+    departureLocation: '上海',
+    departureDate: '2027-04-01',
+    returnDate: '2027-04-02',
+    departurePeriod: 'morning',
+    returnPeriod: 'evening',
     travelDays: 2,
     tripMembers: [
       {
@@ -201,7 +212,7 @@ test('行程展示夹具：按天切换、确认与移动端布局（不调用 A
     path: testInfo.outputPath('itinerary-desktop-fixture.png'),
     fullPage: true,
   })
-  await page.getByRole('button', { name: '第 2 天', exact: true }).click()
+  await page.getByRole('button', { name: '第 2 天 2027-04-02', exact: true }).click()
   await expect(page.getByText('把上午留给博物馆')).toBeVisible()
   await expect(page.getByText('在拙政园听见清晨')).toHaveCount(0)
   await page.getByRole('button', { name: '确认这份行程' }).click()

@@ -83,7 +83,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "只有该旅行发起人才能添加行程");
         }
         // 5、调用ai获取行程和行程明细
-        ItineraryResult itineraryResult = aiItineraryGeneratorService.generatorItinerary(initItineraryPrompt);
+        ItineraryResult itineraryResult = aiItineraryGeneratorService.generatorItinerary(tripService.getInitItineraryPrompt(tripId));
         if(itineraryResult == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "调用AI失败，请重试");
         }
@@ -91,6 +91,12 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
     }
 
     private Long addItineraryByItineraryResult(ItineraryResult itineraryResult, Trip trip) {
+        if (itineraryResult == null || itineraryResult.getItineraryItemResultList() == null
+                || itineraryResult.getItineraryItemResultList().isEmpty()
+                || itineraryResult.getItineraryItemResultList().stream().anyMatch(item -> item == null
+                    || item.getDayNumber() == null || item.getDayNumber() < 1 || item.getDayNumber() > trip.getTravelDays())) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI行程天数超出旅行日期范围，请重试");
+        }
         // 数据持久化
         // 添加行程
         String title = StrUtil.blankToDefault(itineraryResult.getTitle(), trip.getTitle());
@@ -224,7 +230,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有发起人才能确认行程");
         }
         // 4、如果存在ai消息，将其改成已应用，并获取ai消息内容
-        StringBuilder updatePrompt = new StringBuilder();
+        StringBuilder updatePrompt = new StringBuilder(tripService.getInitItineraryPrompt(tripId)).append("\n");
         if(messageList != null && !messageList.isEmpty()){
             List<Long> messageIds = messageList.stream().map(TripMessageAiVO::getId).toList();
             String messageInfos = messageList.stream()

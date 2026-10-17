@@ -1,4 +1,5 @@
 <script setup>
+import { scheduleLabel, routeLabel, dayDate } from '../utils/tripSchedule.js'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { itineraryApi } from '../api/itinerary.js'
@@ -48,10 +49,12 @@ const summary = computed(() =>
   itinerary.value
     ? [
         itinerary.value.title,
+        routeLabel(trip.value),
+        scheduleLabel(trip.value),
         itinerary.value.summary,
         `人均预估：${money(itinerary.value.estimatedCostPerPerson)}`,
         ...days.value.flatMap((d) => [
-          `第 ${d} 天`,
+          `第 ${d} 天 ${dayDate(trip.value?.departureDate, d)}`,
           ...itinerary.value.itineraryItemVOList
             .filter((item) => item.dayNumber === d)
             .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -200,10 +203,11 @@ onMounted(load)
             <div class="eyebrow tiny">Your next getaway</div>
             <h2>{{ trip.title }}</h2>
             <p class="muted tiny">
-              {{ trip.destination }} · {{ trip.travelDays }} 天 ·
+              {{ routeLabel(trip) }} · {{ trip.travelDays }} 天 ·
               {{ trip.tripMembers.length }} 位伙伴
             </p>
           </div>
+          <p class="tiny muted">{{ scheduleLabel(trip) }}</p>
           <span class="trip-icon" aria-hidden="true">🎒</span>
         </div>
         <div v-if="busy" class="callout" role="status"><span class="spinner" /> {{ busyText }}</div>
@@ -221,7 +225,7 @@ onMounted(load)
             <p class="muted">
               {{
                 isOwner
-                  ? 'AI 将参考目的地、旅行天数，以及所有成员的预算与偏好。生成后旅行将标记为已确认，请先邀请好同行的伙伴。'
+                  ? 'AI 将参考出发地、目的地、往返日期和时段，以及所有成员的预算与偏好。生成后旅行将标记为已确认，请先邀请好同行的伙伴。'
                   : '和伙伴一起分享想法，等待发起人生成行程。'
               }}
             </p>
@@ -253,6 +257,7 @@ onMounted(load)
                   @click="day = d"
                 >
                   第 {{ d }} 天
+                  <small v-if="trip.departureDate">{{ dayDate(trip.departureDate, d) }}</small>
                 </button>
               </div>
               <Transition name="day" mode="out-in"

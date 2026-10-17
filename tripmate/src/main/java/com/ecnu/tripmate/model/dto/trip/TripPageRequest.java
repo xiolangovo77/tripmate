@@ -13,6 +13,7 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -30,6 +31,21 @@ public class TripPageRequest extends PageRequest implements Serializable {
      * 目的地
      */
     private String destination;
+
+    /**
+     * 出发地
+     */
+    private String departureLocation;
+
+    /**
+     * 出发日期，用于精确匹配
+     */
+    private LocalDate departureDate;
+
+    /**
+     * 返回日期，即回到出发地的日期；用于精确匹配
+     */
+    private LocalDate returnDate;
 
     /**
      * 旅行天数

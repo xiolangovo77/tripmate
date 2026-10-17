@@ -1,13 +1,13 @@
 package com.ecnu.tripmate.model.dto.trip;
 
-import com.mybatisflex.annotation.Column;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.io.Serial;
-import java.io.Serializable;
 
 @Data
-public class TripUpdateRequest implements Serializable {
+@EqualsAndHashCode(callSuper = true)
+public class TripUpdateRequest extends TripScheduleRequest {
 
     @Serial
     private static final long serialVersionUID = 3191241716373120793L;
@@ -22,14 +22,5 @@ public class TripUpdateRequest implements Serializable {
      */
     private String title;
 
-    /**
-     * 目的地
-     */
-    private String destination;
-
-    /**
-     * 旅行天数
-     */
-    private Integer travelDays;
 }
 

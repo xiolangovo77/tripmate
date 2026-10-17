@@ -14,6 +14,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public BaseResponse<?> unreadableRequest(org.springframework.http.converter.HttpMessageNotReadableException e) {
+        return ResultUtils.error(ErrorCode.PARAMS_ERROR, "请求格式不正确，日期请使用有效的yyyy-MM-dd格式");
+    }
+
     @ExceptionHandler(BusinessException.class)
     public BaseResponse<?> businessExceptionHandler(BusinessException e) {
         log.error("BusinessException", e);

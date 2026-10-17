@@ -5,6 +5,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.math.BigInteger;
 import java.time.LocalDateTime;
 
@@ -52,6 +53,37 @@ public class Trip implements Serializable {
      * 目的地
      */
     private String destination;
+
+    /**
+     * 出发地
+     */
+    @Column("departureLocation")
+    private String departureLocation;
+
+    /**
+     * 出发日期
+     */
+    @Column("departureDate")
+    private LocalDate departureDate;
+
+    /**
+     * 出发时段
+     */
+    @Column("departurePeriod")
+    private String departurePeriod;
+
+    /**
+     * 返回出发地的日期
+     */
+    @Column("returnDate")
+    private LocalDate returnDate;
+
+    /**
+     * 返回时段
+     */
+    @Column("returnPeriod")
+    private String returnPeriod;
+
 
     /**
      * 旅行天数

@@ -54,10 +54,7 @@ public class TripController {
         // 获取用户登录信息
         User loginUser = userService.getLoginUser(request);
         // 获取传入参数
-        String destination = tripAddRequest.getDestination();
-        Integer travelDays = tripAddRequest.getTravelDays();
-        BigDecimal budgetLimit = tripAddRequest.getBudgetLimit();
-        Long tripId = tripService.addTrip(destination, travelDays, budgetLimit, loginUser);
+        Long tripId = tripService.addTrip(tripAddRequest, loginUser);
         return ResultUtils.success(tripId);
     }
 
@@ -95,11 +92,7 @@ public class TripController {
         // 获取用户登录信息
         User loginUser = userService.getLoginUser(request);
         // 获取传入参数
-        long tripId = tripUpdateRequest.getId();
-        String title = tripUpdateRequest.getTitle();
-        String destination = tripUpdateRequest.getDestination();
-        Integer travelDays = tripUpdateRequest.getTravelDays();
-        boolean updateResult = tripService.update(tripId, title, destination, travelDays, loginUser);
+        boolean updateResult = tripService.update(tripUpdateRequest, loginUser);
         return ResultUtils.success(updateResult);
     }
 

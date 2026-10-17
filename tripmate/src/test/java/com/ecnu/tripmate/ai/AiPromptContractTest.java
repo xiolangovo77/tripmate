@@ -93,7 +93,8 @@ class AiPromptContractTest {
             assertNotNull(stream, "提示词必须存在于 classpath");
             prompt = new String(stream.readAllBytes(), StandardCharsets.UTF_8).trim();
         }
-        assertTrue(prompt.contains("【唯一输出契约】"));
+        assertTrue(prompt.contains("JSON"));
+        assertTrue(prompt.contains(resourceName.startsWith("message-") ? "changeStatus" : "itineraryItemResultList"));
         assertFalse(prompt.contains("模拟数据返回"));
         ChatModel model = new ChatModel() {
             @Override
