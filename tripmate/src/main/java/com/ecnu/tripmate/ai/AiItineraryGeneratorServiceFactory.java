@@ -17,7 +17,7 @@ public class AiItineraryGeneratorServiceFactory {
     private ChatModel chatModel;
 
     @Resource
-    private McpToolProvider amapMcpToolProvider;
+    private McpToolProvider mcpToolProvider;
 
     /**
      * 行程生成服务
@@ -27,7 +27,7 @@ public class AiItineraryGeneratorServiceFactory {
     public AiItineraryGeneratorService getAiItineraryGeneratorService(){
         return AiServices.builder(AiItineraryGeneratorService.class)
                 .chatModel(chatModel)
-                .toolProvider(amapMcpToolProvider)
+                .toolProvider(mcpToolProvider)
                 .build();
     }
 

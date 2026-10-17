@@ -1,6 +1,5 @@
 package com.ecnu.tripmate.ai.mcp;
 
-import dev.langchain4j.mcp.McpToolProvider;
 import dev.langchain4j.mcp.client.DefaultMcpClient;
 import dev.langchain4j.mcp.client.McpClient;
 import dev.langchain4j.mcp.client.transport.McpTransport;
@@ -53,16 +52,6 @@ public class AmapMcpConfig {
         return new DefaultMcpClient.Builder()
                 .key("amap-maps")
                 .transport(transport)
-                .build();
-    }
-
-    /**
-     * 将高德 MCP 工具转换成 LangChain4j 的工具提供者
-     */
-    @Bean
-    public McpToolProvider amapMcpToolProvider(McpClient amapMcpClient) {
-        return McpToolProvider.builder()
-                .mcpClients(List.of(amapMcpClient))
                 .build();
     }
 }
