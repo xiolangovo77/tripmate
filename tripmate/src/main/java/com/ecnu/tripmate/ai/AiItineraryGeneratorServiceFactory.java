@@ -1,6 +1,7 @@
 package com.ecnu.tripmate.ai;
 
 
+import dev.langchain4j.mcp.McpToolProvider;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
@@ -15,6 +16,9 @@ public class AiItineraryGeneratorServiceFactory {
     @Resource
     private ChatModel chatModel;
 
+    @Resource
+    private McpToolProvider amapMcpToolProvider;
+
     /**
      * 行程生成服务
      * @return
@@ -23,6 +27,7 @@ public class AiItineraryGeneratorServiceFactory {
     public AiItineraryGeneratorService getAiItineraryGeneratorService(){
         return AiServices.builder(AiItineraryGeneratorService.class)
                 .chatModel(chatModel)
+                .toolProvider(amapMcpToolProvider)
                 .build();
     }
 
