@@ -29,6 +29,10 @@ function fillPrompt(prompt) {
   text.value = text.value.trim() ? `${text.value}\n${prompt}` : prompt
   nextTick(() => composer.value?.focus())
 }
+function mentionAi() {
+  text.value = mentionsAi(text.value) ? text.value : '@AI ' + text.value
+  composer.value?.focus()
+}
 function onKeydown(event) {
   if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {
     event.preventDefault()
@@ -72,7 +76,9 @@ async function refresh(older = false) {
         .sort()[0] || null
     await nextTick()
     if (log.value)
-      log.value.scrollTop = older ? log.value.scrollHeight - oldHeight + oldTop : log.value.scrollHeight
+      log.value.scrollTop = older
+        ? log.value.scrollHeight - oldHeight + oldTop
+        : log.value.scrollHeight
   } catch (cause) {
     error.value = cause.message
   } finally {
@@ -151,11 +157,24 @@ defineExpose({ refresh })
     </div>
     <p class="tiny muted">好行程，从聊聊各自的期待开始。</p>
     <div v-if="error" class="err" role="alert">{{ error }}</div>
-    <div ref="log" class="chat-log" role="log" aria-label="旅行历史消息" aria-live="polite" tabindex="0">
+    <div
+      ref="log"
+      class="chat-log"
+      role="log"
+      aria-label="旅行历史消息"
+      aria-live="polite"
+      tabindex="0"
+    >
       <button v-if="hasMore" class="text-btn tiny" :disabled="loading" @click="refresh(true)">
         加载更早的消息
       </button>
-      <div v-if="!messages.length" class="chat-empty"><span aria-hidden="true">✦</span><strong>{{ loading ? '正在读取消息…' : '你的想法，是旅行的第一站。' }}</strong><p class="tiny muted">{{ loading ? '马上就好' : '聊聊想吃的、想看的，或者让 AI 一起想。' }}</p></div>
+      <div v-if="!messages.length" class="chat-empty">
+        <span aria-hidden="true">✦</span
+        ><strong>{{ loading ? '正在读取消息…' : '你的想法，是旅行的第一站。' }}</strong>
+        <p class="tiny muted">
+          {{ loading ? '马上就好' : '聊聊想吃的、想看的，或者让 AI 一起想。' }}
+        </p>
+      </div>
       <article
         v-for="message in sorted"
         :key="message.id"
@@ -192,9 +211,22 @@ defineExpose({ refresh })
         核对并重试 AI
       </button>
     </div>
-    <div v-if="!messages.length && !loading" class="chat-prompts"><button v-for="prompt in ['大家有什么特别想去的地方？', '@AI 帮我们安排轻松一点的路线']" :key="prompt" type="button" :disabled="sending || aiBusy" @click="fillPrompt(prompt)">{{ prompt }} ↗</button></div>
+    <div v-if="!messages.length && !loading" class="chat-prompts">
+      <button
+        v-for="prompt in ['大家有什么特别想去的地方？', '@AI 帮我们安排轻松一点的路线']"
+        :key="prompt"
+        type="button"
+        :disabled="sending || aiBusy"
+        @click="fillPrompt(prompt)"
+      >
+        {{ prompt }} ↗
+      </button>
+    </div>
     <form class="stack chat-composer" :class="{ 'with-ai': withAi }" @submit.prevent="send">
-      <div class="row between"><label class="label" :for="composerId">说说你的想法</label><span v-if="withAi" class="ai-indicator">✦ AI 将参与回复</span></div>
+      <div class="row between">
+        <label class="label" :for="composerId">说说你的想法</label
+        ><span v-if="withAi" class="ai-indicator">✦ AI 将参与回复</span>
+      </div>
       <textarea
         :id="composerId"
         ref="composer"
@@ -212,9 +244,10 @@ defineExpose({ refresh })
           class="btn btn-soft btn-sm"
           type="button"
           :disabled="sending || aiBusy"
-          @click="text = mentionsAi(text) ? text : '@AI ' + text; composer?.focus()"
+          @click="mentionAi"
         >
-          @AI</button><span :id="`${composerId}-hint`" class="composer-hint">Ctrl / ⌘ + Enter 发送</span
+          @AI</button
+        ><span :id="`${composerId}-hint`" class="composer-hint">Ctrl / ⌘ + Enter 发送</span
         ><button class="btn btn-sm" :disabled="sending || aiBusy || !text.trim()">
           {{ aiBusy ? '等待 AI…' : sending ? '发送中…' : '发送 ↗' }}
         </button>

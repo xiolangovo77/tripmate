@@ -210,6 +210,10 @@ try {
       itineraryId = asId(
         await owner('/itinerary/add', { body: { tripId, initItineraryPrompt }, timeout: 180000 }),
       )
+      assert.equal(
+        await owner('/trip/updateStatus', { body: { id: tripId, status: 'confirmed' } }),
+        true,
+      )
       const plan = await owner('/itinerary/get', { method: 'GET', query: { id: itineraryId } })
       assert.ok(plan.itineraryItemVOList.length)
       assert.equal(plan.tripId, tripId)
@@ -278,6 +282,44 @@ try {
         .code,
       0,
     )
+  })
+  await step('普通成员不能确认或取消旅行', async () => {
+    for (const status of ['confirmed', 'cancelled']) {
+      assert.equal(
+        (await guest('/trip/updateStatus', { body: { id: tripId, status }, allowError: true }))
+          .code,
+        40101,
+      )
+    }
+  })
+  await step('发起人确认旅行状态，可通过已确认筛选读回', async () => {
+    assert.equal(
+      await owner('/trip/updateStatus', { body: { id: tripId, status: 'confirmed' } }),
+      true,
+    )
+    const trips = await guest('/trip/page', {
+      body: { pageNum: 1, pageSize: 6, status: 'confirmed' },
+    })
+    assert.ok(trips.some((trip) => trip.id === tripId))
+  })
+  await step('发起人取消并退出，其他成员可查到已取消旅行', async () => {
+    assert.equal(
+      await owner('/trip/updateStatus', { body: { id: tripId, status: 'cancelled' } }),
+      true,
+    )
+    assert.equal(
+      await owner('/tripMember/updateStatus', {
+        body: { tripId, userId: users[0].id, status: 'left' },
+      }),
+      true,
+    )
+    const trips = await guest('/trip/page', {
+      body: { pageNum: 1, pageSize: 6, status: 'cancelled' },
+    })
+    assert.ok(trips.some((trip) => trip.id === tripId))
+    const room = await guest('/trip/get', { method: 'GET', query: { tripId } })
+    assert.ok(!room.tripMembers.some((member) => member.userId === users[0].id))
+    assert.ok(room.tripMembers.some((member) => member.userId === users[1].id))
   })
   await step('退出登录后原 Session 无法查询旅行', async () => {
     assert.equal(await guest('/user/logout'), true)

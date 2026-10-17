@@ -7,7 +7,9 @@ export const useConfirmStore = defineStore('confirm', () => {
   function ask(options) {
     if (request.value) return Promise.resolve(false)
     request.value = options
-    return new Promise((done) => { resolve = done })
+    return new Promise((done) => {
+      resolve = done
+    })
   }
   function answer(value) {
     request.value = null

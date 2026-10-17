@@ -26,6 +26,8 @@ const planLoading = ref(false)
 const planError = ref('')
 const busy = ref(false)
 const actionError = ref('')
+const tripStatusError = ref('')
+const tripStatusPending = ref(false)
 const busyText = ref('')
 const day = ref(1)
 const suggestions = ref(null)
@@ -88,7 +90,10 @@ async function generate() {
     // 使用服务端收集的旅行/成员提示词，不在浏览器生成行程。
     const prompt = await tripApi.prompt(tripId.value)
     const id = asId(await itineraryApi.generate(tripId.value, prompt))
-    notice.show('AI 行程已生成')
+    itineraryId.value = id
+    tripStatusPending.value = true
+    busyText.value = '行程已生成，正在确认旅行状态…'
+    await syncTripStatus()
     await loadPlan(id)
   } catch (cause) {
     actionError.value = cause.message
@@ -97,11 +102,35 @@ async function generate() {
     busy.value = false
   }
 }
+async function syncTripStatus() {
+  tripStatusError.value = ''
+  try {
+    await tripApi.updateStatus(tripId.value, 'confirmed')
+    tripStatusPending.value = false
+    notice.show('行程已生成，旅行已确认')
+  } catch (cause) {
+    tripStatusError.value = `行程已生成，但旅行状态尚未确认：${cause.message}`
+  }
+}
+async function retryTripStatus() {
+  if (busy.value || !tripStatusPending.value) return
+  busy.value = true
+  busyText.value = '正在确认旅行状态…'
+  try {
+    await syncTripStatus()
+  } finally {
+    busy.value = false
+  }
+}
 async function apply(messages) {
   if (busy.value || !messages.length) return
   if (
     itinerary.value.status === 'confirmed' &&
-    !(await confirmation.ask({ title: '让这份行程再好一点？', message: '采纳建议后会生成新的行程草案，原来的确认状态将重置，需要再次确认。', confirmText: '生成新草案' }))
+    !(await confirmation.ask({
+      title: '让这份行程再好一点？',
+      message: '采纳建议后会生成新的行程草案，原来的确认状态将重置，需要再次确认。',
+      confirmText: '生成新草案',
+    }))
   )
     return
   busy.value = true
@@ -123,7 +152,15 @@ async function apply(messages) {
   }
 }
 async function confirm() {
-  if (busy.value || !(await confirmation.ask({ title: '准备按这份计划出发？', message: '确认后，这份行程将作为大家的出行安排。之后仍可通过 AI 建议调整，调整后需重新确认。', confirmText: '确认行程' }))) return
+  if (
+    busy.value ||
+    !(await confirmation.ask({
+      title: '准备按这份计划出发？',
+      message: '确认后，这份行程将作为大家的出行安排。之后仍可通过 AI 建议调整，调整后需重新确认。',
+      confirmText: '确认行程',
+    }))
+  )
+    return
   busy.value = true
   actionError.value = ''
   busyText.value = '正在确认行程…'
@@ -171,6 +208,12 @@ onMounted(load)
         </div>
         <div v-if="busy" class="callout" role="status"><span class="spinner" /> {{ busyText }}</div>
         <p v-if="actionError" class="error-state" role="alert">{{ actionError }}</p>
+        <div v-if="tripStatusError" class="error-state" role="alert">
+          <p>{{ tripStatusError }}</p>
+          <button class="btn btn-line btn-sm" :disabled="busy" @click="retryTripStatus">
+            重试确认旅行状态
+          </button>
+        </div>
         <AsyncState :loading="planLoading" :error="planError" @retry="loadPlan()"
           ><section v-if="!itinerary" class="card card-pad empty-state">
             <div class="illustration">✦</div>
@@ -178,7 +221,7 @@ onMounted(load)
             <p class="muted">
               {{
                 isOwner
-                  ? 'AI 将参考目的地、旅行天数，以及所有成员的预算与偏好。'
+                  ? 'AI 将参考目的地、旅行天数，以及所有成员的预算与偏好。生成后旅行将标记为已确认，请先邀请好同行的伙伴。'
                   : '和伙伴一起分享想法，等待发起人生成行程。'
               }}
             </p>
@@ -212,28 +255,32 @@ onMounted(load)
                   第 {{ d }} 天
                 </button>
               </div>
-              <Transition name="day" mode="out-in"><div :key="day" class="event-list">
-                <article v-for="event in events" :key="event.id" class="event">
-                  <span class="event-dot" />
-                  <div class="time">
-                    {{ event.startTime?.slice(0, 5) || '待定' }}<br /><span
-                      v-if="event.endTime"
-                      class="tiny"
-                      >{{ event.endTime.slice(0, 5) }}</span
-                    >
-                  </div>
-                  <div class="event-content">
-                    <div class="row between wrap">
-                      <strong>{{ event.activityName }}</strong
-                      ><span class="cost">{{ money(event.estimatedCostPerPerson) }}</span>
+              <Transition name="day" mode="out-in"
+                ><div :key="day" class="event-list">
+                  <article v-for="event in events" :key="event.id" class="event">
+                    <span class="event-dot" />
+                    <div class="time">
+                      {{ event.startTime?.slice(0, 5) || '待定' }}<br /><span
+                        v-if="event.endTime"
+                        class="tiny"
+                        >{{ event.endTime.slice(0, 5) }}</span
+                      >
                     </div>
-                    <p>⌖ {{ event.locationName || '地点待定' }}</p>
-                    <p v-if="event.address">{{ event.address }}</p>
-                    <div class="tiny pre-wrap">{{ event.description }}</div>
-                    <span v-if="event.activityType" class="badge mt">{{ event.activityType }}</span>
-                  </div>
-                </article>
-              </div></Transition>
+                    <div class="event-content">
+                      <div class="row between wrap">
+                        <strong>{{ event.activityName }}</strong
+                        ><span class="cost">{{ money(event.estimatedCostPerPerson) }}</span>
+                      </div>
+                      <p>⌖ {{ event.locationName || '地点待定' }}</p>
+                      <p v-if="event.address">{{ event.address }}</p>
+                      <div class="tiny pre-wrap">{{ event.description }}</div>
+                      <span v-if="event.activityType" class="badge mt">{{
+                        event.activityType
+                      }}</span>
+                    </div>
+                  </article>
+                </div></Transition
+              >
               <div v-if="!events.length" class="empty-state muted">当天暂无活动安排</div>
               <div class="divider" />
               <div class="row between">

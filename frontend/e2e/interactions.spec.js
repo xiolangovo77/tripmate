@@ -4,10 +4,12 @@ import { randomBytes } from 'node:crypto'
 test('真实服务：创建草稿、筛选、聊天快捷键、刷新保留输入和弹窗焦点', async ({ page }, testInfo) => {
   const account = `ui_ux_${Date.now().toString(36)}`
   const password = randomBytes(12).toString('hex')
-  const registration = await page.request.post('/api/user/register', { data: { userAccount: account, userPassword: password, checkPassword: password } })
+  const registration = await page.request.post('/api/user/register', {
+    data: { userAccount: account, userPassword: password, checkPassword: password },
+  })
   expect((await registration.json()).code).toBe(0)
   const runtimeErrors = []
-  page.on('pageerror', error => runtimeErrors.push(error.message))
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
   await page.goto('/')
   await page.getByRole('button', { name: /苏州.*在小巷里慢下来/ }).click()
   await expect(page.getByLabel('这次想去哪里')).toHaveValue('苏州')
@@ -48,7 +50,9 @@ test('真实服务：创建草稿、筛选、聊天快捷键、刷新保留输�
   await page.getByRole('button', { name: '创建邀请码' }).click()
   await expect(page.getByRole('link', { name: '预览邀请' })).toBeVisible()
   let revocations = 0
-  page.on('request', request => { if (request.url().includes('/tripInvitation/updateStatus')) revocations++ })
+  page.on('request', (request) => {
+    if (request.url().includes('/tripInvitation/updateStatus')) revocations++
+  })
   const revoke = page.getByRole('button', { name: '撤销邀请', exact: true })
   await revoke.click()
   const confirmation = page.getByRole('dialog', { name: '收回这份邀请？' })
@@ -77,40 +81,126 @@ test('真实服务：创建草稿、筛选、聊天快捷键、刷新保留输�
   await page.goto(roomUrl)
   await page.getByRole('button', { name: '邀请朋友' }).click()
   await page.getByRole('button', { name: '撤销邀请', exact: true }).click()
-  await page.screenshot({ path: testInfo.outputPath('confirmation-mobile.png'), fullPage: true })
+  await page.screenshot({ path: testInfo.outputPath('confirmation-mobile.png'), animations: 'disabled' })
   await page.getByRole('button', { name: '先等等' }).click()
+  await page.getByRole('button', { name: '关闭弹窗' }).click()
+  const leaving = []
+  page.on('request', (request) => {
+    if (
+      request.url().endsWith('/trip/updateStatus') ||
+      request.url().endsWith('/tripMember/updateStatus')
+    )
+      leaving.push({ url: new URL(request.url()).pathname, body: request.postDataJSON() })
+  })
+  await page.getByRole('button', { name: '取消并退出旅行' }).click()
+  await page.getByRole('button', { name: '确认取消并退出' }).click()
+  await expect(page).toHaveURL(/\/my-trips$/)
+  expect(leaving.map((request) => request.url)).toEqual([
+    '/api/trip/updateStatus',
+    '/api/tripMember/updateStatus',
+  ])
+  expect(leaving[0].body).toEqual({ id: roomUrl.split('/').at(-1), status: 'cancelled' })
+  expect(leaving[1].body.status).toBe('left')
+  await expect(page.getByText('还没有符合条件的旅行')).toBeVisible()
   expect(runtimeErrors).toEqual([])
 })
 
 test('行程展示夹具：按天切换、确认与移动端布局（不调用 AI）', async ({ page }, testInfo) => {
   const user = { id: '101', userAccount: 'fixture', nickname: '林间旅人' }
-  const trip = { id: '202', ownerId: '101', title: '苏州 · 留一点时间给生活', destination: '苏州', travelDays: 2, tripMembers: [{ userId: '101', nickname: '林间旅人', role: 'owner', status: 'joined', travelPace: 'relaxed', budgetLimit: 1200, favoriteActivities: '["美食","自然"]' }] }
-  const itinerary = { title: '巷子里的慢时光', summary: '从园林的清晨，到河边的晚风。留足步行和休息的时间，和朋友一起感受苏州。', status: 'draft', estimatedCostPerPerson: 860, itineraryItemVOList: [
-    { id: '401', dayNumber: 1, sortOrder: 1, startTime: '09:00:00', endTime: '11:00:00', activityName: '在拙政园听见清晨', locationName: '拙政园', address: '苏州市姑苏区东北街', description: '沿着池塘慢慢走，看看光影怎样落在回廊里。', estimatedCostPerPerson: 80, activityType: '自然' },
-    { id: '402', dayNumber: 1, sortOrder: 2, startTime: '12:00:00', endTime: '13:30:00', activityName: '一起吃碗苏式面', locationName: '平江路附近', description: '一碗热汤面，再留点肚子给沿路的小吃。', estimatedCostPerPerson: 40, activityType: '美食' },
-    { id: '403', dayNumber: 2, sortOrder: 1, startTime: '10:00:00', endTime: '12:00:00', activityName: '把上午留给博物馆', locationName: '苏州博物馆', description: '提前预约，慢慢参观。', estimatedCostPerPerson: 0, activityType: '文化' },
-  ] }
+  const trip = {
+    id: '202',
+    ownerId: '101',
+    title: '苏州 · 留一点时间给生活',
+    destination: '苏州',
+    travelDays: 2,
+    tripMembers: [
+      {
+        userId: '101',
+        nickname: '林间旅人',
+        role: 'owner',
+        status: 'joined',
+        travelPace: 'relaxed',
+        budgetLimit: 1200,
+        favoriteActivities: '["美食","自然"]',
+      },
+    ],
+  }
+  const itinerary = {
+    title: '巷子里的慢时光',
+    summary: '从园林的清晨，到河边的晚风。留足步行和休息的时间，和朋友一起感受苏州。',
+    status: 'draft',
+    estimatedCostPerPerson: 860,
+    itineraryItemVOList: [
+      {
+        id: '401',
+        dayNumber: 1,
+        sortOrder: 1,
+        startTime: '09:00:00',
+        endTime: '11:00:00',
+        activityName: '在拙政园听见清晨',
+        locationName: '拙政园',
+        address: '苏州市姑苏区东北街',
+        description: '沿着池塘慢慢走，看看光影怎样落在回廊里。',
+        estimatedCostPerPerson: 80,
+        activityType: '自然',
+      },
+      {
+        id: '402',
+        dayNumber: 1,
+        sortOrder: 2,
+        startTime: '12:00:00',
+        endTime: '13:30:00',
+        activityName: '一起吃碗苏式面',
+        locationName: '平江路附近',
+        description: '一碗热汤面，再留点肚子给沿路的小吃。',
+        estimatedCostPerPerson: 40,
+        activityType: '美食',
+      },
+      {
+        id: '403',
+        dayNumber: 2,
+        sortOrder: 1,
+        startTime: '10:00:00',
+        endTime: '12:00:00',
+        activityName: '把上午留给博物馆',
+        locationName: '苏州博物馆',
+        description: '提前预约，慢慢参观。',
+        estimatedCostPerPerson: 0,
+        activityType: '文化',
+      },
+    ],
+  }
   let confirmations = 0
-  await page.route('**/api/**', async route => {
-    const url = new URL(route.request().url())
-    let data
-    if (url.pathname.endsWith('/user/get')) data = user
-    else if (url.pathname.endsWith('/trip/get')) data = trip
-    else if (url.pathname.endsWith('/getIdByTripId')) data = '303'
-    else if (url.pathname.endsWith('/itinerary/get')) data = itinerary
-    else if (url.pathname.endsWith('/itinerary/confirmed')) {
-      expect(route.request().method()).toBe('PUT')
-      expect(url.searchParams.get('id')).toBe('303')
-      confirmations++
-      itinerary.status = 'confirmed'
-      data = 1
-    } else if (url.pathname.endsWith('/tripMessage/page') || url.pathname.endsWith('/getAiByChangeStatus')) data = []
-    else throw new Error(`意外请求：${url.pathname}`)
-    await route.fulfill({ json: { code: 0, data } })
-  })
+  await page.route(
+    (url) => url.pathname.startsWith('/api/'),
+    async (route) => {
+      const url = new URL(route.request().url())
+      let data
+      if (url.pathname.endsWith('/user/get')) data = user
+      else if (url.pathname.endsWith('/trip/get')) data = trip
+      else if (url.pathname.endsWith('/getIdByTripId')) data = '303'
+      else if (url.pathname.endsWith('/itinerary/get')) data = itinerary
+      else if (url.pathname.endsWith('/itinerary/confirmed')) {
+        expect(route.request().method()).toBe('PUT')
+        expect(url.searchParams.get('id')).toBe('303')
+        confirmations++
+        itinerary.status = 'confirmed'
+        data = 1
+      } else if (
+        url.pathname.endsWith('/tripMessage/page') ||
+        url.pathname.endsWith('/getAiByChangeStatus')
+      )
+        data = []
+      else throw new Error(`意外请求：${url.pathname}`)
+      await route.fulfill({ json: { code: 0, data } })
+    },
+  )
   await page.goto('/trips/202/itinerary')
   await expect(page.getByText('在拙政园听见清晨')).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('itinerary-desktop-fixture.png'), fullPage: true })
+  await page.screenshot({
+    path: testInfo.outputPath('itinerary-desktop-fixture.png'),
+    fullPage: true,
+  })
   await page.getByRole('button', { name: '第 2 天', exact: true }).click()
   await expect(page.getByText('把上午留给博物馆')).toBeVisible()
   await expect(page.getByText('在拙政园听见清晨')).toHaveCount(0)
@@ -122,8 +212,15 @@ test('行程展示夹具：按天切换、确认与移动端布局（不调用 A
   await expect(page.getByRole('button', { name: '已确认行程' })).toBeDisabled()
   expect(confirmations).toBe(1)
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.screenshot({ path: testInfo.outputPath('itinerary-mobile-fixture.png'), fullPage: true })
+  await page.screenshot({
+    path: testInfo.outputPath('itinerary-mobile-fixture.png'),
+    fullPage: true,
+  })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  expect(await page.locator('.page-scene').evaluate(element => getComputedStyle(element).animationName)).toBe('none')
+  expect(
+    await page
+      .locator('.page-scene')
+      .evaluate((element) => getComputedStyle(element).animationName),
+  ).toBe('none')
 })

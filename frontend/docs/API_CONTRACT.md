@@ -4,6 +4,8 @@
 
 当前用户查询：GET `/user/get`，无参数，返回 Session 对应的 LoginUserVO，未登录返回 40100。
 
+旅行状态更新：POST `/trip/updateStatus`，JSON `{ id, status }`，status 使用 confirmed 或 cancelled；仅发起人，返回 boolean，前端严格要求 true。
+
 ## 页面到 API 的映射
 
 | 操作        | HTTP 与地址（省略 /api）                    | 参数与响应                                                                                                |
@@ -74,7 +76,7 @@
 
 消息的成员校验只检查成员记录存在，未过滤 `status=joined`。前端读取详情后只允许当前已加入成员进入房间，但已退出成员的直接 API 请求仍需后端限制。
 
-成员状态/偏好接口仅允许本人操作，没有发起人踢人或代填偏好的接口。退出后成员记录仍在，add 的重复检查会阻止重新加入。前端退出前明确提示，并不提供发起人退出入口。
+成员状态/偏好接口仅允许本人操作，没有发起人踢人或代填偏好的接口。退出后成员记录仍在，add 的重复检查会阻止重新加入。发起人可「取消并退出旅行」：先将 trip.status 改为 cancelled，再将本人的成员状态改为 left。普通成员退出只更新自己的成员状态。若取消失败则停止退出；若取消成功而退出失败，则保留部分成功提示和重试退出入口。
 
 ### 历史消息、AI 与状态
 
@@ -86,7 +88,9 @@ addAi、行程生成和修改没有幂等键。长请求超时后结果不确定
 
 `updateChangeStatusByIds` 中对 applied/ignored 的校验表达式使用同一字符串同时等于两个值的 AND，无法表达预期限制。前端只用 ignored；applied 完全交给 itinerary/update 的事务处理。
 
-确认行程只更新 itinerary，不更新 trip.status。TripVO/TripPageVO 又没有 status 字段，不能从详情显示或推断旅行状态。列表支持状态筛选，但不展示猜测出来的状态徽章。未额外调用 trip/updateStatus 改变产品状态。
+确认行程接口只更新 itinerary，不更新 trip.status。按当前产品要求，前端在 `/itinerary/add` 成功返回有效 ID 后，调用 `/trip/updateStatus` 将旅行设为 confirmed；状态更新失败时保留行程，只重试状态请求。行程本身仍为草案，最终确认沿用 `/itinerary/confirmed`。TripVO/TripPageVO 没有 status 字段，详情不推断旅行状态，列表可按状态筛选核对。
+
+创建行程/确认旅行以及取消旅行/退出成员均由两个独立 HTTP 请求完成，无法保证事务原子性；前端在当前页面保留部分成功提示和定向重试。旅行变为 confirmed 或 cancelled 后，后端邀请校验会拒绝后续加入，生成入口已提示先邀请好伙伴。
 
 暂无消息推送、撤回、直接编辑明细、邀请历史、手动到期时间、旅行/账号删除接口；未用模拟按钮替代。
 

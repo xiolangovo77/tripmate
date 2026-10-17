@@ -26,6 +26,8 @@ const editOpen = ref(false)
 const preferenceOpen = ref(false)
 const busy = ref(false)
 const actionError = ref('')
+const leaveError = ref('')
+const cancelled = ref(false)
 const edit = reactive({ title: '', destination: '', travelDays: 1 })
 const preference = reactive({ budgetLimit: '', travelPace: 'balanced', activities: [] })
 const budgetRange = computed(() => {
@@ -91,16 +93,41 @@ async function save(kind) {
 async function leave() {
   if (
     busy.value ||
-    !(await confirmation.ask({ title: '离开这支旅行小队？', message: '退出后将无法继续参与这趟旅行，也暂时无法通过邀请重新加入。', confirmText: '确认退出', danger: true }))
+    (!cancelled.value &&
+      !(await confirmation.ask(
+        isOwner.value
+          ? {
+              title: '取消旅行并退出？',
+              message:
+                '你是这趟旅行的发起人。退出将把整趟旅行标记为已取消，邀请也将无法继续使用。其他伙伴仍可查看这趟已取消的旅行。',
+              confirmText: '确认取消并退出',
+              danger: true,
+            }
+          : {
+              title: '离开这支旅行小队？',
+              message: '退出后将无法继续参与这趟旅行，也暂时无法通过邀请重新加入。',
+              confirmText: '确认退出',
+              danger: true,
+            },
+      )))
   )
     return
   busy.value = true
+  leaveError.value = ''
   try {
+    if (isOwner.value && !cancelled.value) {
+      await tripApi.updateStatus(tripId.value, 'cancelled')
+      cancelled.value = true
+    }
     await memberApi.leave(tripId.value, auth.user.id)
-    notice.show('已退出旅行')
+    notice.show(isOwner.value ? '旅行已取消，你已退出' : '已退出旅行')
     await router.push('/my-trips')
   } catch (cause) {
-    notice.show(cause.message)
+    leaveError.value = cancelled.value
+      ? `旅行已取消，但退出尚未完成：${cause.message}`
+      : isOwner.value
+        ? `未能取消旅行，尚未执行退出：${cause.message}`
+        : cause.message
   } finally {
     busy.value = false
   }
@@ -112,7 +139,12 @@ onMounted(load)
     <div class="crumb"><RouterLink to="/my-trips">我的旅行</RouterLink> / 旅行房间</div>
     <div class="eyebrow">Good company, great journeys</div>
     <h1 class="h2">{{ trip?.title || '我们的旅行房间' }}</h1>
-    <p class="muted">{{ trip ? `${trip.destination} · ${trip.travelDays} 天` : '先约好同行的人，再慢慢商量路线。' }} <span v-if="trip">· 一起把想法变成计划</span></p>
+    <p class="muted">
+      {{
+        trip ? `${trip.destination} · ${trip.travelDays} 天` : '先约好同行的人，再慢慢商量路线。'
+      }}
+      <span v-if="trip">· 一起把想法变成计划</span>
+    </p>
     <TripNavigation :trip-id="tripId" />
   </div>
   <AsyncState :loading="loading" :error="error" @retry="load"
@@ -123,24 +155,32 @@ onMounted(load)
             <h2 class="h3">
               旅行小队 <span class="badge">{{ trip.tripMembers.length }} 人已加入</span>
             </h2>
-            <button v-if="isOwner" class="btn btn-line btn-sm" @click="inviteOpen = true">
+            <button
+              v-if="isOwner && !cancelled"
+              class="btn btn-line btn-sm"
+              :disabled="busy"
+              @click="inviteOpen = true"
+            >
               ↗ 邀请朋友
             </button>
           </div>
           <div class="divider" />
           <MemberList :members="trip.tripMembers" :user-id="auth.user?.id" />
           <div class="actions-row">
-            <button class="btn btn-soft btn-sm" @click="openPreference">修改我的本次偏好</button
-            ><button class="text-btn tiny" @click="load">刷新成员</button
-            ><button
-              v-if="!isOwner"
-              class="text-btn tiny danger-text"
-              :disabled="busy"
-              @click="leave"
+            <button
+              class="btn btn-soft btn-sm"
+              :disabled="busy || cancelled"
+              @click="openPreference"
             >
-              退出旅行
+              修改我的本次偏好</button
+            ><button class="text-btn tiny" @click="load">刷新成员</button
+            ><button class="text-btn tiny danger-text" :disabled="busy" @click="leave">
+              {{
+                busy ? '处理中…' : cancelled ? '重试退出' : isOwner ? '取消并退出旅行' : '退出旅行'
+              }}
             </button>
           </div>
+          <p v-if="leaveError" class="err" role="alert">{{ leaveError }}</p>
         </section>
         <TripChat :trip-id="tripId" :members="trip.tripMembers" />
       </div>
@@ -161,11 +201,20 @@ onMounted(load)
             </div>
           </div>
           <div class="agent-bubble">
-            {{ trip.tripMembers.length === 1 ? '旅行已经开始筹备。先邀请同行的朋友，让大家填好各自的偏好。' : '伙伴们的期待已在这里。准备好后，把这些想法交给 AI 整理成行程。' }}
+            {{
+              trip.tripMembers.length === 1
+                ? '旅行已经开始筹备。先邀请同行的朋友，让大家填好各自的偏好。'
+                : '伙伴们的期待已在这里。准备好后，把这些想法交给 AI 整理成行程。'
+            }}
           </div>
-          <RouterLink class="btn btn-wide mt" :to="`/trips/${tripId}/itinerary`"
+          <RouterLink v-if="!cancelled" class="btn btn-wide mt" :to="`/trips/${tripId}/itinerary`"
             >✦ 进入 AI 行程</RouterLink
-          ><button v-if="isOwner" class="btn btn-line btn-wide mt" @click="openEdit">
+          ><button
+            v-if="isOwner && !cancelled"
+            class="btn btn-line btn-wide mt"
+            :disabled="busy"
+            @click="openEdit"
+          >
             修改旅行基本信息
           </button>
         </section>

@@ -90,19 +90,36 @@ async function logout() {
     </div>
   </footer>
   <nav class="mobile-nav" aria-label="移动端导航">
-    <RouterLink v-for="link in links" :key="link.text" :to="link.to" :class="{ active: isActive(link) }" :aria-current="isActive(link) ? 'page' : undefined"
+    <RouterLink
+      v-for="link in links"
+      :key="link.text"
+      :to="link.to"
+      :class="{ active: isActive(link) }"
+      :aria-current="isActive(link) ? 'page' : undefined"
       ><span>{{ link.icon }}</span
       >{{ link.text }}</RouterLink
     >
   </nav>
-  <Transition name="toast"><div v-if="notice.message" class="toast show" role="status" aria-live="polite">
-    <span aria-hidden="true">✓</span> {{ notice.message }}
-  </div></Transition>
-  <ModalDialog v-if="confirmation.request" :title="confirmation.request.title" @close="confirmation.answer(false)">
+  <Transition name="toast"
+    ><div v-if="notice.message" class="toast show" role="status" aria-live="polite">
+      <span aria-hidden="true">✓</span> {{ notice.message }}
+    </div></Transition
+  >
+  <ModalDialog
+    v-if="confirmation.request"
+    :title="confirmation.request.title"
+    @close="confirmation.answer(false)"
+  >
     <p class="confirm-description">{{ confirmation.request.message }}</p>
     <div class="confirm-actions">
       <button class="btn btn-line" autofocus @click="confirmation.answer(false)">先等等</button>
-      <button class="btn" :class="{ 'btn-danger': confirmation.request.danger }" @click="confirmation.answer(true)">{{ confirmation.request.confirmText || '确认' }}</button>
+      <button
+        class="btn"
+        :class="{ 'btn-danger': confirmation.request.danger }"
+        @click="confirmation.answer(true)"
+      >
+        {{ confirmation.request.confirmText || '确认' }}
+      </button>
     </div>
   </ModalDialog>
 </template>

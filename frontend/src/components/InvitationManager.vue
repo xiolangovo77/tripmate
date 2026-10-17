@@ -42,7 +42,15 @@ async function load() {
   }
 }
 async function create() {
-  if (busy.value || (invitation.value && !(await confirmation.ask({ title: '换一张新的邀请？', message: '更新后，之前分享的邀请码和链接将失效。已加入的伙伴不受影响。', confirmText: '更新邀请码' }))))
+  if (
+    busy.value ||
+    (invitation.value &&
+      !(await confirmation.ask({
+        title: '换一张新的邀请？',
+        message: '更新后，之前分享的邀请码和链接将失效。已加入的伙伴不受影响。',
+        confirmText: '更新邀请码',
+      })))
+  )
     return
   busy.value = true
   actionError.value = ''
@@ -57,7 +65,16 @@ async function create() {
   }
 }
 async function revoke() {
-  if (busy.value || !(await confirmation.ask({ title: '收回这份邀请？', message: '撤销后，朋友将无法通过这个链接加入。已加入的伙伴不受影响。', confirmText: '确认撤销', danger: true }))) return
+  if (
+    busy.value ||
+    !(await confirmation.ask({
+      title: '收回这份邀请？',
+      message: '撤销后，朋友将无法通过这个链接加入。已加入的伙伴不受影响。',
+      confirmText: '确认撤销',
+      danger: true,
+    }))
+  )
+    return
   busy.value = true
   actionError.value = ''
   try {

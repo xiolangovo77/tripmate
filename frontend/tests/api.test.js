@@ -82,6 +82,14 @@ test('API 适配器严格遵守 HTTP 方法、Query/Body 和 AI 消息关联', a
   assert.equal(calls[6].method, 'get')
   assert.equal(calls[6].url, '/user/get')
   assert.equal(calls[6].skipAuthRedirect, true)
+  http.defaults.adapter = async (config) => {
+    calls.push(config)
+    return { data: '{"code":0,"data":true}', status: 200, headers: {}, config }
+  }
+  await tripApi.updateStatus(id, 'confirmed')
+  assert.equal(calls[7].method, 'post')
+  assert.equal(calls[7].url, '/trip/updateStatus')
+  assert.deepEqual(JSON.parse(calls[7].data), { id, status: 'confirmed' })
 })
 test('仅明确的无数据响应转换为空状态，权限和网络错误必须保留', async () => {
   let response = { code: 40000, message: '该用户不存在旅行信息' }
@@ -105,4 +113,5 @@ test('仅明确的无数据响应转换为空状态，权限和网络错误必�
   assert.ok(expired)
   response = { code: 0, data: false }
   await assert.rejects(invitationApi.check('123', 'ABCD2345'), { code: 'RESULT' })
+  await assert.rejects(tripApi.updateStatus('123', 'cancelled'), { code: 'RESULT' })
 })

@@ -7,6 +7,7 @@ export const tripApi = {
   create: (body) => http.post('/trip/add', body),
   get: (tripId) => http.get('/trip/get', { params: { tripId } }),
   update: (body) => http.post('/trip/update', body).then(requireTrue),
+  updateStatus: (id, status) => http.post('/trip/updateStatus', { id, status }).then(requireTrue),
   prompt: (tripId) => http.get('/trip/getPrompt', { params: { tripId } }),
   async page(body, config) {
     try {
