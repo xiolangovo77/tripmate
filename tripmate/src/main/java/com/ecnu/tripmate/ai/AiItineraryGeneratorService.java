@@ -1,8 +1,10 @@
 package com.ecnu.tripmate.ai;
 
+import com.ecnu.tripmate.ai.guardrail.UserMessageCheckInputGuardrail;
 import com.ecnu.tripmate.ai.model.ItineraryResult;
 import com.ecnu.tripmate.ai.model.MessageResponseResult;
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.guardrail.InputGuardrails;
 
 public interface AiItineraryGeneratorService {
 
@@ -28,5 +30,6 @@ public interface AiItineraryGeneratorService {
       * @return
       */
      @SystemMessage(fromResource = "prompt/message-response-system-prompt.txt")
+     @InputGuardrails({ UserMessageCheckInputGuardrail.class})
      MessageResponseResult messageResponse(String userMessage);
 }

@@ -2,6 +2,7 @@ package com.ecnu.tripmate.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import com.ecnu.tripmate.ai.guardrail.TripCityValidator;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.dto.trip.TripPageRequest;
@@ -49,6 +50,9 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
     @Resource
     private ItineraryMapper itineraryMapper;
 
+    @Resource
+    private TripCityValidator tripCityValidator;
+
     @Override
     @Transactional
     public Long addTrip(TripAddRequest request, User loginuser) {
@@ -58,6 +62,8 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
         if(budgetLimit == null || budgetLimit.compareTo(BigDecimal.ZERO) <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "预算金额必须为正数");
         }
+        // 在写入旅行和发起人成员记录之前检查城市真实性。
+        tripCityValidator.validate(request.getDepartureLocation(), destination);
         // 2、设置默认值
         long ownerId = loginuser.getId();
         String defaultTitle = String.format("%s%d日游", destination, travelDays);
@@ -126,6 +132,12 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
                 || !Objects.equals(trip.getReturnPeriod(), request.getReturnPeriod());
         if (scheduleChanged && hasItinerary(trip.getId())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "已有行程，不能直接修改路线或出行日期、时段，请新建旅行重新规划");
+        }
+        // 允许修改路线时也检查新城市，避免创建后通过编辑绕过校验。
+        // 仅修改标题、日期或时段时，不重复调用检查模型。
+        if (!Objects.equals(trip.getDepartureLocation(), request.getDepartureLocation())
+                || !Objects.equals(trip.getDestination(), request.getDestination())) {
+            tripCityValidator.validate(request.getDepartureLocation(), request.getDestination());
         }
         BeanUtil.copyProperties(request, trip);
         trip.setTitle(request.getTitle().trim());
