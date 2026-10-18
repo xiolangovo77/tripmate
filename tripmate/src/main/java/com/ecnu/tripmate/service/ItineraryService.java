@@ -51,10 +51,10 @@ public interface ItineraryService extends IService<Itinerary> {
 
     /**
      * 获取行程更新的提示词
-     * @param itineraryResult 行程和行程明细的信息
+     * @param itineraryVO 行程和行程明细的信息
      * @return
      */
-    String getItineraryInfosPrompt(ItineraryResult itineraryResult);
+    String getItineraryInfosPrompt(ItineraryVO itineraryVO);
 
     /**
      * 删除行程和行程明细

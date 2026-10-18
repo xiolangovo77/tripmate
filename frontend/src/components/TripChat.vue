@@ -156,6 +156,7 @@ defineExpose({ refresh })
       </button>
     </div>
     <p class="tiny muted">好行程，从聊聊各自的期待开始。</p>
+    <p class="tiny muted">@AI 会结合旅行信息和已有的问答记忆回复。</p>
     <div v-if="error" class="err" role="alert">{{ error }}</div>
     <div
       ref="log"

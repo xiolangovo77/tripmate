@@ -3,5 +3,18 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ecnu.tripmate.mapper.TripMessageMapper">
-
+    <select id="selectRecentAiReplies" resultType="com.ecnu.tripmate.model.entity.TripMessage">
+        SELECT answer.*
+        FROM trip_message answer
+        INNER JOIN trip_message question ON question.id = answer.replyToId
+            AND question.tripId = answer.tripId
+        WHERE answer.tripId = #{tripId}
+            AND answer.role = 'assistant'
+            AND question.role = 'user'
+            AND answer.isDelete = 0 AND question.isDelete = 0
+            AND answer.recallStatus = 'normal' AND question.recallStatus = 'normal'
+            AND TRIM(answer.content) != '' AND TRIM(question.content) != ''
+        ORDER BY answer.createTime DESC, answer.id DESC
+        LIMIT #{limit}
+    </select>
 </mapper>

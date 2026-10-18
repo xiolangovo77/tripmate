@@ -3,19 +3,25 @@ package com.ecnu.tripmate.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorService;
+import com.ecnu.tripmate.ai.AiItineraryGeneratorServiceFactory;
 import com.ecnu.tripmate.ai.model.ItineraryItemResult;
 import com.ecnu.tripmate.ai.model.ItineraryResult;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.entity.ItineraryItem;
 import com.ecnu.tripmate.model.entity.Trip;
+import com.ecnu.tripmate.model.entity.TripMember;
+import com.ecnu.tripmate.model.entity.TripMessage;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.enums.ItineraryStatusEnum;
 import com.ecnu.tripmate.model.enums.tripMessage.TripMessageChangeStatusEnum;
+import com.ecnu.tripmate.model.enums.tripMessage.TripMessageRecallStatusEnum;
+import com.ecnu.tripmate.model.enums.tripMessage.TripMessageRoleEnum;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryItemVO;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryVO;
 import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.service.ItineraryItemService;
+import com.ecnu.tripmate.service.TripMemberService;
 import com.ecnu.tripmate.service.TripService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -34,7 +40,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -49,13 +57,16 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
     private TripService tripService;
 
     @Resource
-    private AiItineraryGeneratorService aiItineraryGeneratorService;
+    private AiItineraryGeneratorServiceFactory aiItineraryGeneratorServiceFactory;
 
     @Resource
     private ItineraryItemService itineraryItemService;
 
     @Resource
     private TripMessageServiceImpl tripMessageService;
+
+    @Resource
+    private TripMemberService tripMemberService;
 
     @Override
     @Transactional
@@ -83,6 +94,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "只有该旅行发起人才能添加行程");
         }
         // 5、调用ai获取行程和行程明细
+        AiItineraryGeneratorService aiItineraryGeneratorService = aiItineraryGeneratorServiceFactory.getAiItineraryGeneratorService(tripId);
         ItineraryResult itineraryResult = aiItineraryGeneratorService.generatorItinerary(tripService.getInitItineraryPrompt(tripId));
         if(itineraryResult == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "调用AI失败，请重试");
@@ -229,29 +241,64 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
         if(ownerId != loginUserId){
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有发起人才能确认行程");
         }
-        // 4、如果存在ai消息，将其改成已应用，并获取ai消息内容
+        // 4、读取选中建议及其对应的用户原始问题，校验并标记建议为已应用
         StringBuilder updatePrompt = new StringBuilder(tripService.getInitItineraryPrompt(tripId)).append("\n");
         if(messageList != null && !messageList.isEmpty()){
-            List<Long> messageIds = messageList.stream().map(TripMessageAiVO::getId).toList();
-            String messageInfos = messageList.stream()
-                    .map(message -> String.format("消息时间：%s 消息内容%s",
-                            message.getCreateTime(), message.getContent()))
-                            .collect(Collectors.joining("\n"));
-            updatePrompt.append("用户的建议如下：\n").append(messageInfos).append("\n");
+            if (messageList.stream().anyMatch(message -> message == null
+                    || message.getId() == null || message.getId() <= 0)) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "建议消息id不合法");
+            }
+            List<Long> messageIds = messageList.stream().map(TripMessageAiVO::getId).distinct().toList();
+            // 此方法会校验旅行归属、AI角色、撤回状态及待处理状态；后续失败由当前事务回滚。
             tripMessageService.updateChangeStatusByIds(tripId, messageIds, TripMessageChangeStatusEnum.APPLIED.getValue(), loginuser);
+            // 正文和关联关系均以数据库为准，不使用前端传来的建议正文或时间。
+            List<TripMessage> aiMessages = tripMessageService.getMapper().selectListByQuery(new QueryWrapper()
+                    .in("id", messageIds)
+                    .eq("tripId", tripId)
+                    .eq("role", TripMessageRoleEnum.ASSISTANT.getValue())
+                    .eq("recallStatus", TripMessageRecallStatusEnum.NORMAL.getValue())
+                    .orderBy("createTime", true).orderBy("id", true));
+            if (aiMessages.size() != messageIds.size()) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "部分建议消息已不可用，请刷新后重试");
+            }
+            List<Long> questionIds = aiMessages.stream().map(TripMessage::getReplyToId)
+                    .filter(Objects::nonNull).distinct().toList();
+            Map<Long, TripMessage> questions = questionIds.isEmpty() ? Map.of()
+                    : tripMessageService.getMapper().selectListByQuery(new QueryWrapper()
+                            .in("id", questionIds)
+                            .eq("tripId", tripId)
+                            .eq("role", TripMessageRoleEnum.USER.getValue())
+                            .eq("recallStatus", TripMessageRecallStatusEnum.NORMAL.getValue()))
+                    .stream().collect(Collectors.toMap(TripMessage::getId, Function.identity()));
+            // 与旅行成员背景使用相同的昵称，避免逐条查询用户资料。
+            Map<Long, String> nicknames = tripMemberService.list(new QueryWrapper().eq("tripId", tripId))
+                    .stream().collect(Collectors.toMap(TripMember::getUserId,
+                            member -> StrUtil.blankToDefault(member.getNickname(), "未知成员"),
+                            (first, second) -> first));
+            updatePrompt.append("用户的建议如下（每组包含原始问题和对应的AI建议）：\n");
+            for (int i = 0; i < aiMessages.size(); i++) {
+                TripMessage aiMessage = aiMessages.get(i);
+                TripMessage question = aiMessage.getReplyToId() == null ? null : questions.get(aiMessage.getReplyToId());
+                updatePrompt.append(String.format("【建议%d】\n", i + 1));
+                if (question != null && StrUtil.isNotBlank(question.getContent())) {
+                    updatePrompt.append(String.format("用户昵称：%s\n提问时间：%s\n用户原始问题：\n%s\n",
+                            nicknames.getOrDefault(question.getSenderId(), "未知成员"),
+                            question.getCreateTime(), question.getContent()));
+                } else {
+                    updatePrompt.append("用户原始问题：不可用（未关联、已删除、已撤回或内容为空），请勿推测原文。\n");
+                }
+                updatePrompt.append(String.format("AI回复时间：%s\nAI建议：\n%s\n\n",
+                        aiMessage.getCreateTime(), aiMessage.getContent()));
+            }
         }
         // 5、获得更新行程的提示词
-        ItineraryResult itineraryResult = new ItineraryResult();
-        BeanUtil.copyProperties(itineraryVO, itineraryResult);
-        List<ItineraryItemVO> itineraryItemList = itineraryVO.getItineraryItemVOList();
-        List<ItineraryItemResult> itineraryItemResultList = BeanUtil.copyToList(itineraryItemList, ItineraryItemResult.class);
-        itineraryResult.setItineraryItemResultList(itineraryItemResultList);
-        String itineraryInfos = this.getItineraryInfosPrompt(itineraryResult);
+        String itineraryInfos = this.getItineraryInfosPrompt(itineraryVO);
         if(itineraryInfos == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成更新提示词失败");
         }
         updatePrompt.append(itineraryInfos);
         // 6、调用ai获取行程和行程明细
+        AiItineraryGeneratorService aiItineraryGeneratorService = aiItineraryGeneratorServiceFactory.getAiItineraryGeneratorService(tripId);
         ItineraryResult itineraryUpdateResult = aiItineraryGeneratorService.updateItinerary(updatePrompt.toString());
         // 7、删除原来的行程和行程明细
         this.delete(id);
@@ -260,7 +307,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
     }
 
     @Override
-    public String getItineraryInfosPrompt(ItineraryResult itineraryResult) {
+    public String getItineraryInfosPrompt(ItineraryVO itineraryVO) {
 
         StringBuilder itineraryInfosPrompt = new StringBuilder();
 
@@ -277,17 +324,16 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
             
             【当前行程安排】
             """,
-                itineraryResult.getTitle(),
-                itineraryResult.getSummary(),
-                itineraryResult.getEstimatedCostPerPerson() == null ?
+                itineraryVO.getTitle(),
+                itineraryVO.getSummary(),
+                itineraryVO.getEstimatedCostPerPerson() == null ?
                         "暂无" :
-                        itineraryResult.getEstimatedCostPerPerson().toPlainString()
+                        itineraryVO.getEstimatedCostPerPerson().toPlainString()
         ));
 
-        List<ItineraryItemResult> itineraryItemResultList =
-                itineraryResult.getItineraryItemResultList();
+        List<ItineraryItemVO> itineraryItemVOList = itineraryVO.getItineraryItemVOList();
 
-        for (ItineraryItemResult item : itineraryItemResultList) {
+        for (ItineraryItemVO item : itineraryItemVOList) {
 
             itineraryInfosPrompt.append(String.format("""
                 

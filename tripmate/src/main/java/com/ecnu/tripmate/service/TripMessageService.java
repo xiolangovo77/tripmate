@@ -5,6 +5,7 @@ import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.model.vo.tripMessage.TripMessageVO;
 import com.mybatisflex.core.service.IService;
 import com.ecnu.tripmate.model.entity.TripMessage;
+import dev.langchain4j.memory.ChatMemory;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,6 +16,14 @@ import java.util.List;
  * @author Wolfcub
  */
 public interface TripMessageService extends IService<TripMessage> {
+
+    /**
+     * 初始化空的旅行记忆：旅行及成员、当前行程及明细、最近20对完整的AI问答。
+     * 仅供内部调用；已有记忆时不重复加载，历史问答按时间正序写入。
+     * @param tripId 旅行id
+     * @param chatMemory id与tripId一致的聊天记忆（配置存储后会自动持久化）
+     */
+    void loadChatMemory(Long tripId, ChatMemory chatMemory);
 
     /**
      * 添加用户消息

@@ -84,6 +84,8 @@
 
 addAi、行程生成和修改没有幂等键。长请求超时后结果不确定，前端不会自动重发写请求；AI 重试会先查询回复，但无法彻底消除后端仍在处理或回复已超出最新页时的重复风险。
 
+AI 回复和重试仅传递 `tripId`、`replyToId`，不查询或传递 `itineraryId`，前端不设置必须已有行程的限制。旅行上下文及历史问答记忆由后端加载。
+
 `itinerary/update` 直接使用客户端发送的 AI 消息 content/createTime 构造提示词，建议后端按 ID 从数据库重读；前端始终传递刚从服务端读取的消息。
 
 `updateChangeStatusByIds` 中对 applied/ignored 的校验表达式使用同一字符串同时等于两个值的 AND，无法表达预期限制。前端只用 ignored；applied 完全交给 itinerary/update 的事务处理。
