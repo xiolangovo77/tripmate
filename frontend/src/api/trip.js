@@ -19,6 +19,8 @@ export const tripApi = {
   },
 }
 export const memberApi = {
+  list: (tripId, config) => http.get(`/trip/${encodeURIComponent(tripId)}/members`, config),
+  eventsUrl: (tripId) => http.getUri({ url: `/trip/${encodeURIComponent(tripId)}/events` }),
   join: ({ tripId, inviteCode, budgetLimit }) =>
     http.post('/tripMember/add', { tripId, inviteCode, budgetLimit }).then(asId),
   update: (body) => http.post('/tripMember/update', body).then(requireTrue),

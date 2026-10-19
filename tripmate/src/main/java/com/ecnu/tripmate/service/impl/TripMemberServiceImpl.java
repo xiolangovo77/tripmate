@@ -2,6 +2,8 @@ package com.ecnu.tripmate.service.impl;
 
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONUtil;
+import cn.hutool.core.bean.BeanUtil;
+import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.entity.Trip;
@@ -21,6 +23,9 @@ import jakarta.annotation.Resource;
 import lombok.NonNull;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Transactional;
+import com.ecnu.tripmate.event.TripMembersChangedEvent;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -41,7 +46,41 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
     @Resource
     private TripInvitationService tripInvitationService;
 
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
+
     @Override
+    public List<TripMemberVO> getActiveMembers(long tripId, long userId) {
+        tripService.isTripExists(tripId);
+        List<TripMember> current = this.mapper.selectListByQuery(activeMembers(tripId)
+                .orderBy("joinedTime", true).orderBy("id", true));
+        if (current.stream().noneMatch(member -> member.getUserId().equals(userId))) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "你已不在此旅行小队中");
+        }
+        return BeanUtil.copyToList(current, TripMemberVO.class);
+    }
+
+    @Override
+    public void checkMemberAccess(long tripId, long userId) {
+        tripService.isTripExists(tripId);
+        if (this.mapper.selectCountByQuery(activeMembers(tripId).eq("userId", userId)) == 0) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "你已不在此旅行小队中");
+        }
+    }
+
+    /**
+     * 构建旅行有效成员的查询条件。
+     *
+     * @param tripId 旅行ID
+     * @return 限定旅行ID和已加入状态的查询条件
+     */
+    private QueryWrapper activeMembers(long tripId) {
+        return QueryWrapper.create().eq("tripId", tripId)
+                .eq("status", TripMemberStatusEnum.JOINED.getValue());
+    }
+
+    @Override
+    @Transactional
     public Long add(long tripId, String role, String inviteCode, User logiguser, BigDecimal budgetLimit) {
         // 1、校验参数
         if(tripId <= 0){
@@ -72,7 +111,8 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
         // 4、是否重复加入旅行
         QueryWrapper queryWrapper1 = new QueryWrapper();
         queryWrapper1.eq("tripId", tripId)
-                .eq("userId", logiguser.getId());
+                .eq("userId", logiguser.getId())
+                .eq("status", TripMemberStatusEnum.JOINED.getValue());
         long count1 = this.mapper.selectCountByQuery(queryWrapper1);
         if(count1 > 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "您已加入该旅行");
@@ -100,10 +140,12 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
         if(!saveResult){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "加入成员失败，数据库错误");
         }
+        eventPublisher.publishEvent(new TripMembersChangedEvent(tripId));
         return tripMember.getTripId();
     }
 
     @Override
+    @Transactional
     public boolean updateTripMemberStatus(long tripId,long userId, String status, User loginuser) {
         // 1、参数校验
         if(tripId <= 0){
@@ -129,20 +171,16 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
         if(!updateResult){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "更新状态失败，数据库错误");
         }
+        eventPublisher.publishEvent(new TripMembersChangedEvent(tripId));
         return updateResult;
     }
 
-    /**
-     * 判断旅行成员是否存在
-     * @param tripId 旅行id
-     * @param userId 用户id
-     * @return
-     */
     private TripMember getTripMember(long tripId, long userId) {
         tripService.isTripExists(tripId);
         QueryWrapper queryWrapper = new QueryWrapper();
         queryWrapper.eq("tripId", tripId)
-                .eq("userId", userId);
+                .eq("userId", userId)
+                .eq("status", TripMemberStatusEnum.JOINED.getValue());
         TripMember tripMember = this.mapper.selectOneByQuery(queryWrapper);
         if(tripMember == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "请先加入旅行");
@@ -151,6 +189,7 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
     }
 
     @Override
+    @Transactional
     public boolean update(long tripId, long userId, BigDecimal budgetLimit, String travelPace, String favoriteActivities, User loginuser) {
         // 1、参数校验
         if(budgetLimit == null || budgetLimit.compareTo(BigDecimal.ZERO) <= 0){
@@ -182,6 +221,7 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
         if(!updateResult){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "更新状态失败，数据库错误");
         }
+        eventPublisher.publishEvent(new TripMembersChangedEvent(tripId));
         return updateResult;
     }
 

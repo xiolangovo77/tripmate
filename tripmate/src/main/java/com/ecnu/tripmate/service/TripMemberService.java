@@ -4,6 +4,7 @@ import com.ecnu.tripmate.model.entity.Trip;
 import com.ecnu.tripmate.model.entity.User;
 import com.mybatisflex.core.service.IService;
 import com.ecnu.tripmate.model.entity.TripMember;
+import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -14,6 +15,23 @@ import java.util.List;
  * @author Wolfcub
  */
 public interface TripMemberService extends IService<TripMember> {
+
+    /**
+     * 获取旅行当前已加入的成员列表，并校验查询用户的成员权限。
+     *
+     * @param tripId 旅行ID
+     * @param userId 当前登录用户ID
+     * @return 按加入时间和成员记录ID升序排列的成员列表
+     */
+    List<TripMemberVO> getActiveMembers(long tripId, long userId);
+
+    /**
+     * 校验旅行是否存在，以及用户是否仍有成员访问权限。
+     *
+     * @param tripId 旅行ID
+     * @param userId 待校验的用户ID
+     */
+    void checkMemberAccess(long tripId, long userId);
 
     /**
      * 加入成员信息

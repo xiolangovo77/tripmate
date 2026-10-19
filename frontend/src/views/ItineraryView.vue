@@ -20,7 +20,16 @@ const confirmation = useConfirmStore()
 const route = useRoute()
 const auth = useAuthStore()
 const notice = useNoticeStore()
-const { tripId, trip, isOwner, loading, error, load: loadTrip } = useTrip(route)
+const {
+  tripId,
+  trip,
+  isOwner,
+  loading,
+  error,
+  load: loadTrip,
+  memberSyncStatus,
+  memberSyncError,
+} = useTrip(route)
 const itinerary = ref(null)
 const itineraryId = ref(null)
 const planLoading = ref(false)
@@ -329,9 +338,10 @@ onMounted(load)
         />
         <section class="card card-pad">
           <h2 class="h3 mb">旅行搭子们</h2>
-          <MemberList :members="trip.tripMembers" :user-id="auth.user?.id" /><RouterLink
-            class="btn btn-line btn-wide mt"
-            :to="`/trips/${tripId}`"
+          <MemberList :members="trip.tripMembers" :user-id="auth.user?.id" />
+          <p class="tiny muted" role="status">{{ memberSyncStatus }}</p>
+          <p v-if="memberSyncError" class="tiny err">{{ memberSyncError }}</p>
+          <RouterLink class="btn btn-line btn-wide mt" :to="`/trips/${tripId}`"
             >← 修改我的旅行偏好</RouterLink
           >
         </section>

@@ -149,26 +149,18 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
         return updateResult;
     }
 
-    /**
-     * 判断旅行是否存在
-     * @param tripId 旅行id
-     * @return
-     */
     @Override
     public Trip isTripExists(long tripId){
+        if(tripId <= 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
+        }
         Trip trip = this.getById(tripId);
         if(trip == null){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行不存在，请创建");
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "旅行不存在，请创建");
         }
         return trip;
     }
 
-    /**
-     * 校验用户是否为旅行发起人
-     *
-     * @param trip 旅行信息
-     * @param loginUser 当前登录用户
-     */
     @Override
     public void checkTripOwner(Trip trip, User loginUser) {
         Long ownerId = trip.getOwnerId();

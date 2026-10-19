@@ -28,7 +28,18 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const notice = useNoticeStore()
-const { tripId, trip, me, isOwner, loading, error, load } = useTrip(route)
+const {
+  tripId,
+  trip,
+  me,
+  isOwner,
+  loading,
+  error,
+  load,
+  refreshMembers,
+  memberSyncStatus,
+  memberSyncError,
+} = useTrip(route)
 const inviteOpen = ref(false)
 const editOpen = ref(false)
 const preferenceOpen = ref(false)
@@ -92,7 +103,8 @@ async function save(kind) {
     notice.show('修改已保存')
     editOpen.value = false
     preferenceOpen.value = false
-    await load()
+    if (kind === 'preference') await refreshMembers()
+    else await load()
   } catch (cause) {
     actionError.value = cause.message
   } finally {
@@ -100,11 +112,12 @@ async function save(kind) {
   }
 }
 async function leave() {
+  const leavingAsOwner = isOwner.value
   if (
     busy.value ||
     (!cancelled.value &&
       !(await confirmation.ask(
-        isOwner.value
+        leavingAsOwner
           ? {
               title: '取消旅行并退出？',
               message:
@@ -124,17 +137,17 @@ async function leave() {
   busy.value = true
   leaveError.value = ''
   try {
-    if (isOwner.value && !cancelled.value) {
+    if (leavingAsOwner && !cancelled.value) {
       await tripApi.updateStatus(tripId.value, 'cancelled')
       cancelled.value = true
     }
     await memberApi.leave(tripId.value, auth.user.id)
-    notice.show(isOwner.value ? '旅行已取消，你已退出' : '已退出旅行')
+    notice.show(leavingAsOwner ? '旅行已取消，你已退出' : '已退出旅行')
     await router.push('/my-trips')
   } catch (cause) {
     leaveError.value = cancelled.value
       ? `旅行已取消，但退出尚未完成：${cause.message}`
-      : isOwner.value
+      : leavingAsOwner
         ? `未能取消旅行，尚未执行退出：${cause.message}`
         : cause.message
   } finally {
@@ -176,6 +189,8 @@ onMounted(load)
           </div>
           <div class="divider" />
           <MemberList :members="trip.tripMembers" :user-id="auth.user?.id" />
+          <p class="tiny muted" role="status">{{ memberSyncStatus }}</p>
+          <p v-if="memberSyncError" class="tiny err">{{ memberSyncError }}</p>
           <div class="actions-row">
             <button
               class="btn btn-soft btn-sm"
@@ -183,7 +198,7 @@ onMounted(load)
               @click="openPreference"
             >
               修改我的本次偏好</button
-            ><button class="text-btn tiny" @click="load">刷新成员</button
+            ><button class="text-btn tiny" @click="refreshMembers">刷新成员</button
             ><button class="text-btn tiny danger-text" :disabled="busy" @click="leave">
               {{
                 busy ? '处理中…' : cancelled ? '重试退出' : isOwner ? '取消并退出旅行' : '退出旅行'
@@ -231,10 +246,10 @@ onMounted(load)
       </aside>
     </div></AsyncState
   >
-  <ModalDialog v-if="inviteOpen" title="邀请朋友加入" @close="inviteOpen = false"
+  <ModalDialog v-if="inviteOpen && trip" title="邀请朋友加入" @close="inviteOpen = false"
     ><InvitationManager :trip-id="tripId"
   /></ModalDialog>
-  <ModalDialog v-if="editOpen" title="修改旅行信息" @close="!busy && (editOpen = false)"
+  <ModalDialog v-if="editOpen && trip" title="修改旅行信息" @close="!busy && (editOpen = false)"
     ><form class="stack" @submit.prevent="save('trip')">
       <div>
         <label class="label" for="edit-title">旅行名称</label
@@ -256,7 +271,7 @@ onMounted(load)
     </form></ModalDialog
   >
   <ModalDialog
-    v-if="preferenceOpen"
+    v-if="preferenceOpen && trip"
     title="我的本次旅行偏好"
     @close="!busy && (preferenceOpen = false)"
     ><form class="stack" @submit.prevent="save('preference')">

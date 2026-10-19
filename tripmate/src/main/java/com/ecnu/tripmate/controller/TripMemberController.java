@@ -12,6 +12,8 @@ import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.enums.trip.TripMemberRoleEnum;
 import com.ecnu.tripmate.model.enums.trip.TripMemberStatusEnum;
 import com.ecnu.tripmate.service.UserService;
+import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
+import org.springframework.http.ResponseEntity;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +23,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.ecnu.tripmate.model.entity.TripMember;
 import com.ecnu.tripmate.service.TripMemberService;
@@ -37,7 +38,6 @@ import java.util.List;
  * @author Wolfcub
  */
 @RestController
-@RequestMapping("/tripMember")
 public class TripMemberController {
 
     @Resource
@@ -47,12 +47,26 @@ public class TripMemberController {
     private UserService userService;
 
     /**
+     * 获取旅行当前已加入的成员列表，仅允许该旅行的有效成员访问。
+     *
+     * @param tripId 旅行ID
+     * @param request 当前HTTP请求，用于获取登录用户
+     * @return 禁止缓存的成员列表响应
+     */
+    @GetMapping("/trip/{tripId}/members")
+    public ResponseEntity<BaseResponse<List<TripMemberVO>>> members(@PathVariable long tripId, HttpServletRequest request) {
+        User user = userService.getLoginUser(request);
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(ResultUtils.success(tripMemberService.getActiveMembers(tripId, user.getId())));
+    }
+
+    /**
      * 修改旅行成员状态
      * @param tripMemberUpdateStatusRequest 修改旅行成员状态请求
      * @param request
      * @return
      */
-    @PostMapping("updateStatus")
+    @PostMapping("/tripMember/updateStatus")
     public BaseResponse<Boolean> updateStatus(@RequestBody TripMemberUpdateStatusRequest tripMemberUpdateStatusRequest, HttpServletRequest request){
         if(tripMemberUpdateStatusRequest == null || request == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -73,7 +87,7 @@ public class TripMemberController {
      * @param request
      * @return
      */
-    @PostMapping("update")
+    @PostMapping("/tripMember/update")
     public BaseResponse<Boolean> update(@RequestBody TripMemberUpdateRequest tripMemberUpdateRequest, HttpServletRequest request){
         if(tripMemberUpdateRequest == null || request == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -96,7 +110,7 @@ public class TripMemberController {
      * @param request
      * @return
      */
-    @PostMapping("add")
+    @PostMapping("/tripMember/add")
     public BaseResponse<Long> add(@RequestBody TripMemberAddRequest tripMemberAddRequest, HttpServletRequest request){
         if(tripMemberAddRequest == null || request == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);

@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS `trip_member` (
     `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updateTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_trip_member_trip_user` (`tripId`, `userId`),
+    KEY `idx_trip_member_trip_user` (`tripId`, `userId`),
     KEY `idx_trip_member_user_status` (`userId`, `status`),
     KEY `idx_trip_member_trip_status` (`tripId`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='旅行成员表';

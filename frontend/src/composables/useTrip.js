@@ -1,11 +1,13 @@
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { tripApi } from '../api/trip.js'
 import { useAuthStore } from '../stores/auth.js'
 import { sameId } from '../utils/format.js'
 import { asId } from '../utils/json.js'
+import { useTripMembers } from './useTripMembers.js'
 export function useTrip(route) {
   const auth = useAuthStore()
   const trip = ref(null)
+  const loadedTripId = ref(null)
   const error = ref('')
   const loading = ref(true)
   const tripId = computed(() => String(route.params.tripId))
@@ -13,19 +15,42 @@ export function useTrip(route) {
     trip.value?.tripMembers?.find((member) => sameId(member.userId, auth.user?.id)),
   )
   const isOwner = computed(() => sameId(trip.value?.ownerId, auth.user?.id))
+  const memberSync = useTripMembers({
+    tripId,
+    trip,
+    enabled: computed(
+      () =>
+        !!trip.value &&
+        loadedTripId.value === tripId.value &&
+        !loading.value &&
+        !error.value &&
+        !!auth.user,
+    ),
+    onAccessLost(message) {
+      error.value = message
+      trip.value = null
+    },
+  })
+  let revision = 0
+  onUnmounted(() => revision++)
   async function load() {
+    const requestRevision = ++revision
+    const id = tripId.value
     loading.value = true
     error.value = ''
     try {
-      const data = await tripApi.get(asId(tripId.value))
+      const data = await tripApi.get(asId(id))
+      if (requestRevision !== revision || id !== tripId.value) return
       if (!data.tripMembers?.some((member) => sameId(member.userId, auth.user?.id)))
         throw new Error('你尚未加入此旅行，请通过好友的邀请加入。')
       trip.value = data
+      loadedTripId.value = id
     } catch (cause) {
+      if (requestRevision !== revision || id !== tripId.value) return
       error.value = cause.message
     } finally {
-      loading.value = false
+      if (requestRevision === revision && id === tripId.value) loading.value = false
     }
   }
-  return { tripId, trip, me, isOwner, loading, error, load }
+  return { tripId, trip, me, isOwner, loading, error, load, ...memberSync }
 }
