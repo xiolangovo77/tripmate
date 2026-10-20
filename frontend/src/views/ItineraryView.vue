@@ -341,6 +341,7 @@ onMounted(load)
           v-if="isOwner"
           ref="suggestions"
           :trip-id="tripId"
+          :events="tripEvents"
           :busy="busy"
           :can-apply="!!itinerary && !planError && !planSyncError && !planLoading"
           @apply="apply"

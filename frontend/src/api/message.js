@@ -13,9 +13,9 @@ export const messageApi = {
   add: (tripId, content) => http.post('/tripMessage/add', { tripId, content }),
   ai: (tripId, replyToId) =>
     http.post('/tripMessage/addAi', { tripId, replyToId }, { timeout: 180000 }),
-  async suggestions(tripId, changeStatus) {
+  async suggestions(tripId, changeStatus, config) {
     try {
-      return await http.post('/tripMessage/getAiByChangeStatus', { tripId, changeStatus })
+      return await http.post('/tripMessage/getAiByChangeStatus', { tripId, changeStatus }, config)
     } catch (error) {
       if (error.code === 40400 && error.message === 'ai消息列表为空') return []
       throw error

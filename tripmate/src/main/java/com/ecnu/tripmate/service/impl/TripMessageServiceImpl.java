@@ -9,6 +9,7 @@ import com.ecnu.tripmate.ai.model.ItineraryItemResult;
 import com.ecnu.tripmate.ai.model.ItineraryResult;
 import com.ecnu.tripmate.ai.model.MessageResponseResult;
 import com.ecnu.tripmate.exception.BusinessException;
+import com.ecnu.tripmate.event.TripSuggestionsChangedEvent;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.entity.Trip;
 import com.ecnu.tripmate.model.entity.TripMember;
@@ -35,6 +36,7 @@ import dev.langchain4j.memory.ChatMemory;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +69,9 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
     @Resource
     @Lazy
     private ItineraryService itineraryService;
+
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
 
     private static final int HISTORY_PAIR_LIMIT = 20;
 
@@ -251,6 +256,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
     }
 
     @Override
+    @Transactional
     public String addAi(Long tripId, Long replyToId, User loginUser) {
         // 1、校验参数
         if(tripId <= 0){
@@ -328,6 +334,9 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         boolean saveResult = this.save(tripAiMessage);
         if(!saveResult){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "保存ai消息失败，数据库错误");
+        }
+        if (!TripMessageChangeStatusEnum.NONE.getValue().equals(changeStatus)) {
+            eventPublisher.publishEvent(new TripSuggestionsChangedEvent(tripId));
         }
         return content;
     }
@@ -431,6 +440,8 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if(updateCount != distinctIds.size()){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "修改建议状态失败");
         }
+        // 采纳建议时加入行程更新的外层事务，AI生成失败回滚时不会推送。
+        eventPublisher.publishEvent(new TripSuggestionsChangedEvent(tripId));
         return updateCount;
     }
 }

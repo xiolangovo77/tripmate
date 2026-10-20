@@ -9,6 +9,7 @@ export function useTripSnapshot({
   apply,
   reset = () => {},
   paused = ref(false),
+  queryKey = ref(null),
 }) {
   const ready = ref(false)
   const refreshing = ref(false)
@@ -69,13 +70,15 @@ export function useTripSnapshot({
   const unsubscribe = events.onEvent(eventName, refresh)
   const stopSync = events.onSync(refresh)
   watch(
-    [tripId, events.active],
-    ([id, active], [previousId]) => {
-      if (!active || id !== previousId) cancel()
-      if (id !== previousId) {
+    [tripId, events.active, queryKey],
+    ([id, active, key], [previousId, , previousKey]) => {
+      const changed = id !== previousId || key !== previousKey
+      if (!active || changed) cancel()
+      if (changed) {
         ready.value = false
         error.value = ''
         reset()
+        if (active) refresh()
       }
     },
     { flush: 'sync' },
