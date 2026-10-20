@@ -47,10 +47,11 @@ public interface TripMessageService extends IService<TripMessage> {
      * @param tripId 旅行id
      * @param pageSize 页面大小
      * @param lastCreateTime 最后一条记录的创建时间
+     * @param lastId 最后一条记录的id，与lastCreateTime成对传入
      * @param loginUser 登陆用户信息
      * @return
      */
-    List<TripMessageVO> page(Long tripId, int pageSize, LocalDateTime lastCreateTime, User loginUser);
+    List<TripMessageVO> page(Long tripId, int pageSize, LocalDateTime lastCreateTime, Long lastId, User loginUser);
 
     /**
      * 添加ai消息

@@ -81,11 +81,12 @@ public class TripMessageController {
     public BaseResponse<List<TripMessageVO>> page(@RequestParam Long tripId,
                                                   @RequestParam(defaultValue = "10") int pageSize,
                                                   @RequestParam(required = false) LocalDateTime lastCreateTime,
+                                                  @RequestParam(required = false) Long lastId,
                                                   HttpServletRequest request
                                                   ){
         // 获取登录用户
         User loginUser = userService.getLoginUser(request);
-        List<TripMessageVO> tripMessageVOList = tripMessageService.page(tripId, pageSize, lastCreateTime, loginUser);
+        List<TripMessageVO> tripMessageVOList = tripMessageService.page(tripId, pageSize, lastCreateTime, lastId, loginUser);
         return ResultUtils.success(tripMessageVOList);
     }
 

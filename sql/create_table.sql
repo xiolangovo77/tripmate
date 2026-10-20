@@ -138,6 +138,6 @@ CREATE TABLE IF NOT EXISTS `trip_message` (
     `updateTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_trip_message_trip_id` (`tripId`, `id`),
-    KEY `idx_trip_message_trip_created` (`tripId`, `createTime`),
+    KEY `idx_trip_message_trip_created` (`tripId`, `createTime`, `id`),
     KEY `idx_trip_message_change_status` (`tripId`, `changeStatus`, `createTime`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='旅行消息表';

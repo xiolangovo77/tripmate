@@ -25,7 +25,7 @@
 | 验证邀请    | POST `/tripInvitation/check`                | JSON：tripId、inviteCode；返回 boolean；无需登录                                                                                                     |
 | 撤销邀请    | POST `/tripInvitation/updateStatus`         | JSON：tripId、inviteCode、status=revoked                                                                                                             |
 | 加入旅行    | POST `/tripMember/add`                      | JSON：tripId、inviteCode、budgetLimit；后端固定 member 角色                                                                                          |
-| 历史消息    | GET `/tripMessage/page`                     | Query：tripId、pageSize=30、可选 lastCreateTime；返回数组                                                                                            |
+| 历史消息    | GET `/tripMessage/page`                     | Query：tripId、pageSize=30；翻页时成对传入 lastCreateTime、lastId，首页均不传；返回数组                                                               |
 | 普通消息    | POST `/tripMessage/add`                     | JSON：tripId、content；不回复时省略 replyToId；返回用户消息 ID                                                                                       |
 | AI 回复     | POST `/tripMessage/addAi`                   | JSON：tripId、replyToId=用户消息 ID；返回字符串，并在后端保存 AI 消息                                                                                |
 | AI 建议列表 | POST `/tripMessage/getAiByChangeStatus`     | JSON：tripId、changeStatus；仅发起人，返回 id/content/createTime                                                                                     |
@@ -80,7 +80,7 @@
 
 ### 历史消息、AI 与状态
 
-`TripMessageServiceImpl.page` 只在没有 lastCreateTime 时指定 createTime 降序；带游标时没有排序。时间游标使用严格 `<`，同一时间超过一页的消息还可能遗漏。前端对取得的消息排序和按 ID 去重，但无法修复服务端分页遗漏。建议后端始终按 createTime/id 降序，并使用复合游标。
+`TripMessageServiceImpl.page` 始终按 createTime、id 降序分页。历史翻页使用上一页末条消息的 `(lastCreateTime, lastId)` 联合游标，条件为 `createTime < lastCreateTime OR (createTime = lastCreateTime AND id < lastId)`；两个参数必须同时提供或同时省略。前端将同一条消息的时间和 ID 一起保存为游标，ID 保持字符串，使用 BigInt 比较同一时间下的消息顺序，并按 ID 合并去重。刷新最新消息时清除旧分页边界，响应不足 30 条时停止继续翻页。
 
 addAi、行程生成和修改没有幂等键。长请求超时后结果不确定，前端不会自动重发写请求；AI 重试会先查询回复，但无法彻底消除后端仍在处理或回复已超出最新页时的重复风险。
 

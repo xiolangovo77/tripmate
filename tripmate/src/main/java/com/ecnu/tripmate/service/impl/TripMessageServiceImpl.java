@@ -204,13 +204,19 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
     }
 
     @Override
-    public List<TripMessageVO> page(Long tripId, int pageSize, LocalDateTime lastCreateTime, User loginUser) {
+    public List<TripMessageVO> page(Long tripId, int pageSize, LocalDateTime lastCreateTime, Long lastId, User loginUser) {
         // 1、参数校验
         if(tripId <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
         }
         if(!(pageSize >= 0 && pageSize <= 50)){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "页面大小不合法");
+        }
+        if ((lastCreateTime == null) != (lastId == null)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "联合游标不合法");
+        }
+        if (lastId != null && lastId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "消息id游标不合法");
         }
         // 2、判断旅行是否存在
         tripService.isTripExists(tripId);
@@ -226,13 +232,16 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         // 4、封装分页sql请求
         QueryWrapper queryWrapper1 = new QueryWrapper();
         queryWrapper1.eq("tripId", tripId);
-        // 游标查询逻辑 - 只是用lastCreateTime作为游标
-        if(lastCreateTime != null){
-            queryWrapper1.lt("createTime", lastCreateTime);
-        }else{
-            // 默认按照创建时间降序
-            queryWrapper1.orderBy("createTime", false);
+        // 游标查询逻辑 - 用（lastCreateTime，lastId）作为游标
+        if (lastCreateTime != null) {
+            queryWrapper1.and(
+                    "(createTime < ? OR (createTime = ? AND id < ?))",
+                    lastCreateTime, lastCreateTime, lastId
+            );
         }
+        // 默认按照创建时间降序
+        queryWrapper1.orderBy("createTime", false);
+        queryWrapper1.orderBy("id", false);
         // 5、查询数据库
         Page<TripMessage> page = this.page(Page.of(1, pageSize), queryWrapper1);
         // 6、返回VO

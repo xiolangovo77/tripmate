@@ -45,35 +45,38 @@ watch(text, async () => {
   composer.value.style.height = 'auto'
   composer.value.style.height = `${Math.min(composer.value.scrollHeight, 200)}px`
 })
-const sorted = computed(() =>
-  [...messages.value].sort(
-    (a, b) =>
-      String(a.createTime).localeCompare(String(b.createTime)) ||
-      String(a.id).localeCompare(String(b.id)),
-  ),
-)
+function compareMessages(a, b) {
+  const timeOrder = String(a.createTime).localeCompare(String(b.createTime))
+  if (timeOrder) return timeOrder
+  // 与后端的数值ID排序一致，避免字符串排序或Number转换造成顺序、精度错误。
+  const left = BigInt(asId(a.id))
+  const right = BigInt(asId(b.id))
+  return left < right ? -1 : left > right ? 1 : 0
+}
+const sorted = computed(() => [...messages.value].sort(compareMessages))
 function merge(incoming) {
   const byId = new Map(messages.value.map((item) => [String(item.id), item]))
   for (const item of incoming) byId.set(String(item.id), item)
   messages.value = [...byId.values()]
 }
 async function refresh(older = false) {
-  if (loading.value) return
+  if (loading.value || (older && (!hasMore.value || !cursor.value))) return
   loading.value = true
   error.value = ''
   const oldHeight = log.value?.scrollHeight || 0
   const oldTop = log.value?.scrollTop || 0
   try {
     const batch = await messageApi.page(props.tripId, older ? cursor.value : undefined)
+    // 后端按createTime、id降序返回，末条消息的两个字段必须作为同一组游标。
+    const oldest = batch.at(-1)
+    const nextCursor = oldest
+      ? { lastCreateTime: oldest.createTime, lastId: asId(oldest.id) }
+      : null
     if (older) merge(batch)
     else messages.value = batch
     // 刷新从最新一页重新建立游标，避免两次刷新间超过一页消息时漏掉中间记录。
     hasMore.value = batch.length === 30
-    cursor.value =
-      batch
-        .map((item) => item.createTime)
-        .filter(Boolean)
-        .sort()[0] || null
+    cursor.value = nextCursor
     await nextTick()
     if (log.value)
       log.value.scrollTop = older

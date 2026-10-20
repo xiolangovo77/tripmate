@@ -66,11 +66,12 @@ test('API 适配器严格遵守 HTTP 方法、Query/Body 和 AI 消息关联', a
   assert.equal(calls[3].method, 'put')
   assert.deepEqual(calls[3].params, { id })
   assert.ok(!calls[3].data)
-  await messageApi.page('123', '2026-10-15T12:00:00')
+  await messageApi.page('123', { lastCreateTime: '2026-10-15T12:00:00', lastId: id })
   assert.deepEqual(calls[4].params, {
     tripId: '123',
     pageSize: 30,
     lastCreateTime: '2026-10-15T12:00:00',
+    lastId: id,
   })
   await memberApi.join({ tripId: '123', inviteCode: 'ABCD2345', budgetLimit: '500', role: 'owner' })
   assert.deepEqual(JSON.parse(calls[5].data), {
