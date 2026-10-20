@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth.js'
 import { sameId } from '../utils/format.js'
 import { asId } from '../utils/json.js'
 import { useTripMembers } from './useTripMembers.js'
+import { useTripEvents } from './useTripEvents.js'
 export function useTrip(route) {
   const auth = useAuthStore()
   const trip = ref(null)
@@ -15,9 +16,8 @@ export function useTrip(route) {
     trip.value?.tripMembers?.find((member) => sameId(member.userId, auth.user?.id)),
   )
   const isOwner = computed(() => sameId(trip.value?.ownerId, auth.user?.id))
-  const memberSync = useTripMembers({
+  const tripEvents = useTripEvents({
     tripId,
-    trip,
     enabled: computed(
       () =>
         !!trip.value &&
@@ -31,6 +31,7 @@ export function useTrip(route) {
       trip.value = null
     },
   })
+  const memberSync = useTripMembers({ tripId, trip, events: tripEvents })
   let revision = 0
   onUnmounted(() => revision++)
   async function load() {
@@ -52,5 +53,5 @@ export function useTrip(route) {
       if (requestRevision === revision && id === tripId.value) loading.value = false
     }
   }
-  return { tripId, trip, me, isOwner, loading, error, load, ...memberSync }
+  return { tripId, trip, me, isOwner, loading, error, load, tripEvents, ...memberSync }
 }

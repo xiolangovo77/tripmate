@@ -12,6 +12,7 @@ import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.ecnu.tripmate.service.ItineraryService;
 
@@ -77,6 +78,22 @@ public class ItineraryController {
         // 获取传入参数
         ItineraryVO ItineraryVO = itineraryService.get(id);
         return ResultUtils.success(ItineraryVO);
+    }
+
+    /**
+     * 根据旅行ID获取当前行程及全部明细，仅允许已登录的有效旅行成员访问。
+     *
+     * @param tripId 旅行ID
+     * @param request 当前HTTP请求，用于获取登录用户
+     * @return 禁止缓存的完整行程响应；尚未生成行程时data为null
+     */
+    @GetMapping("getByTripId")
+    public ResponseEntity<BaseResponse<ItineraryVO>> getByTripId(
+            @RequestParam Long tripId, HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        ItineraryVO itinerary = itineraryService.getByTripId(tripId, loginUser);
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(ResultUtils.success(itinerary));
     }
 
     /**

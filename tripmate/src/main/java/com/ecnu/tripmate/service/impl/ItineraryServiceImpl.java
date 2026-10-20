@@ -6,6 +6,7 @@ import com.ecnu.tripmate.ai.AiItineraryGeneratorService;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorServiceFactory;
 import com.ecnu.tripmate.ai.model.ItineraryItemResult;
 import com.ecnu.tripmate.ai.model.ItineraryResult;
+import com.ecnu.tripmate.event.TripItineraryChangedEvent;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.entity.ItineraryItem;
@@ -32,6 +33,8 @@ import jakarta.annotation.Resource;
 import org.springframework.cglib.core.Local;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -68,6 +71,9 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
     @Resource
     private TripMemberService tripMemberService;
 
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
+
     @Override
     @Transactional
     public Long add(Long tripId, String initItineraryPrompt, User loginUser) {
@@ -99,7 +105,9 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
         if(itineraryResult == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "调用AI失败，请重试");
         }
-        return addItineraryByItineraryResult(itineraryResult, trip);
+        Long itineraryId = addItineraryByItineraryResult(itineraryResult, trip);
+        eventPublisher.publishEvent(new TripItineraryChangedEvent(tripId));
+        return itineraryId;
     }
 
     private Long addItineraryByItineraryResult(ItineraryResult itineraryResult, Trip trip) {
@@ -165,6 +173,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
     }
 
     @Override
+    @Transactional
     public int confirmed(Long id, User loginUser) {
         // 1、参数校验
         if(id <= 0){
@@ -196,6 +205,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
         if(updateResult <= 0){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "确认行程失败，数据库错误");
         }
+        eventPublisher.publishEvent(new TripItineraryChangedEvent(tripId));
         return updateResult;
     }
 
@@ -212,14 +222,43 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
         if(itinerary == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "行程不存在");
         }
-        // 3、获取行程明细
+        return buildItineraryVO(itinerary);
+    }
+
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public ItineraryVO getByTripId(Long tripId, User loginUser) {
+        if (tripId == null || tripId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
+        }
+        if (loginUser == null || loginUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        // 复用成员服务中的旅行存在性及已加入状态校验。
+        tripMemberService.checkMemberAccess(tripId, loginUser.getId());
+        Itinerary itinerary = this.mapper.selectOneByQuery(QueryWrapper.create()
+                .eq("tripId", tripId)
+                .orderBy("createTime", false)
+                .orderBy("id", false)
+                .limit(1));
+        if (itinerary == null) {
+            return null;
+        }
+        return buildItineraryVO(itinerary);
+    }
+
+    private ItineraryVO buildItineraryVO(Itinerary itinerary) {
         QueryWrapper queryWrapper1 = new QueryWrapper();
-        queryWrapper1.eq("itineraryId", id);
+        queryWrapper1.eq("itineraryId", itinerary.getId())
+                .orderBy("dayNumber", true)
+                .orderBy("sortOrder", true)
+                .orderBy("startTime", true)
+                .orderBy("id", true);
         List<ItineraryItem> itineraryItemList = itineraryItemService.getMapper().selectListByQuery(queryWrapper1);
         if(itineraryItemList == null || itineraryItemList.isEmpty()){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "不存在行程明细");
         }
-        // 4、封装结果返回
+        // 同时复制行程自身的ID，便于客户端确认或更新当前版本。
         ItineraryVO itineraryVO = new ItineraryVO();
         BeanUtil.copyProperties(itinerary, itineraryVO);
         List<ItineraryItemVO> itineraryItemVOList = BeanUtil.copyToList(itineraryItemList, ItineraryItemVO.class);
@@ -303,7 +342,10 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
         // 7、删除原来的行程和行程明细
         this.delete(id);
         // 8、数据持久化
-        return this.addItineraryByItineraryResult(itineraryUpdateResult, trip);
+        Long newItineraryId = this.addItineraryByItineraryResult(itineraryUpdateResult, trip);
+        // 内部删除和创建不分别发通知，仅对完整替换结果发布一次事件。
+        eventPublisher.publishEvent(new TripItineraryChangedEvent(tripId));
+        return newItineraryId;
     }
 
     @Override

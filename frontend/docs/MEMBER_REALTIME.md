@@ -1,6 +1,6 @@
 # 旅行成员自动同步
 
-旅行房间与 AI 行程页共用 `useTrip` / `useTripMembers`。每个可见页面建立一条带 Session Cookie 的 SSE 连接，只刷新成员列表、人数和预算等派生显示，不刷新聊天消息、行程明细或 AI 建议，也不覆盖正在填写的偏好表单。
+旅行房间与 AI 行程页通过 `useTripEvents` 管理共享连接，每个可见页面建立一条带 Session Cookie 的 SSE 连接。`useTripMembers` 监听成员事件，只刷新成员列表、人数和预算等派生显示，不覆盖正在填写的偏好表单。AI 行程页的 `useTripItinerary` 在同一连接上监听行程事件，详见 [行程自动同步](ITINERARY_REALTIME.md)。聊天消息和 AI 建议尚未接入自动同步。
 
 ## 后端接口
 

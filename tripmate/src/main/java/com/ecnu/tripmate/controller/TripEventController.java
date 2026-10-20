@@ -35,7 +35,7 @@ public class TripEventController {
     }
 
     /**
-     * 订阅旅行成员变化事件，建立带登录和成员权限校验的SSE连接。
+     * 订阅旅行成员及行程变化事件，建立带登录和成员权限校验的SSE连接。
      *
      * @param tripId 旅行ID
      * @param request 当前HTTP请求，用于获取登录用户

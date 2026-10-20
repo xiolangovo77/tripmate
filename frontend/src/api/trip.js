@@ -4,6 +4,7 @@ export const isEmptyTrips = (error) =>
   (error.code === 40000 && error.message === '该用户不存在旅行信息') ||
   (error.code === 40400 && error.message === '不存在旅行信息')
 export const tripApi = {
+  eventsUrl: (tripId) => http.getUri({ url: `/trip/${encodeURIComponent(tripId)}/events` }),
   create: (body) => http.post('/trip/add', body),
   get: (tripId) => http.get('/trip/get', { params: { tripId } }),
   update: (body) => http.post('/trip/update', body).then(requireTrue),
@@ -20,7 +21,6 @@ export const tripApi = {
 }
 export const memberApi = {
   list: (tripId, config) => http.get(`/trip/${encodeURIComponent(tripId)}/members`, config),
-  eventsUrl: (tripId) => http.getUri({ url: `/trip/${encodeURIComponent(tripId)}/events` }),
   join: ({ tripId, inviteCode, budgetLimit }) =>
     http.post('/tripMember/add', { tripId, inviteCode, budgetLimit }).then(asId),
   update: (body) => http.post('/tripMember/update', body).then(requireTrue),

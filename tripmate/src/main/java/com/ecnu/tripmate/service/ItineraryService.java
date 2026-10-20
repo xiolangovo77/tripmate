@@ -41,6 +41,15 @@ public interface ItineraryService extends IService<Itinerary> {
     ItineraryVO get(Long id);
 
     /**
+     * 根据旅行ID读取当前行程及全部明细，并校验查询用户的成员权限。
+     *
+     * @param tripId 旅行ID
+     * @param loginUser 当前登录用户
+     * @return 包含当前行程ID的完整行程；尚未生成行程时返回null
+     */
+    ItineraryVO getByTripId(Long tripId, User loginUser);
+
+    /**
      * 更新行程和行程明细
      * @param id 行程id
      * @param messageList ai消息列表

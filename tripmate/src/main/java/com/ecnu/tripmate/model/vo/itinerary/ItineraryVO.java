@@ -1,7 +1,5 @@
 package com.ecnu.tripmate.model.vo.itinerary;
 
-import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
-import com.mybatisflex.annotation.Column;
 import lombok.Data;
 
 import java.io.Serial;
@@ -13,6 +11,11 @@ import java.util.List;
 public class ItineraryVO implements Serializable {
     @Serial
     private static final long serialVersionUID = 3191241716373120793L;
+
+    /**
+     * 当前行程ID，采纳建议替换行程后会变化
+     */
+    private Long id;
 
     /**
      * 旅行ID，一次旅行对应一份当前行程
@@ -40,7 +43,7 @@ public class ItineraryVO implements Serializable {
     private String status;
 
     /**
-     * 旅行成员
+     * 行程明细
      */
     private List<ItineraryItemVO> itineraryItemVOList;
 }

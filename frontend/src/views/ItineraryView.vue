@@ -5,9 +5,9 @@ import { useRoute } from 'vue-router'
 import { itineraryApi } from '../api/itinerary.js'
 import { tripApi } from '../api/trip.js'
 import { useTrip } from '../composables/useTrip.js'
+import { useTripItinerary } from '../composables/useTripItinerary.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useNoticeStore } from '../stores/notice.js'
-import { asId } from '../utils/json.js'
 import { money } from '../utils/format.js'
 import AsyncState from '../components/AsyncState.vue'
 import TripChat from '../components/TripChat.vue'
@@ -29,17 +29,24 @@ const {
   load: loadTrip,
   memberSyncStatus,
   memberSyncError,
+  tripEvents,
 } = useTrip(route)
-const itinerary = ref(null)
-const itineraryId = ref(null)
-const planLoading = ref(false)
-const planError = ref('')
 const busy = ref(false)
 const actionError = ref('')
 const tripStatusError = ref('')
 const tripStatusPending = ref(false)
 const busyText = ref('')
 const day = ref(1)
+const {
+  itinerary,
+  itineraryId,
+  planLoading,
+  planRefreshing,
+  planError,
+  planSyncError,
+  planSyncStatus,
+  loadPlan,
+} = useTripItinerary({ tripId, trip, events: tripEvents, busy, day })
 const suggestions = ref(null)
 const chat = ref(null)
 const days = computed(() =>
@@ -55,7 +62,7 @@ const events = computed(() =>
     ),
 )
 const summary = computed(() =>
-  itinerary.value
+  itinerary.value && trip.value
     ? [
         itinerary.value.title,
         routeLabel(trip.value),
@@ -75,23 +82,9 @@ const summary = computed(() =>
       ].join('\n')
     : '',
 )
-async function loadPlan(id) {
-  planLoading.value = true
-  planError.value = ''
-  try {
-    const value = id || (await itineraryApi.idByTrip(tripId.value))
-    itineraryId.value = value == null ? null : asId(value)
-    itinerary.value = itineraryId.value ? await itineraryApi.get(itineraryId.value) : null
-    if (!days.value.includes(day.value)) day.value = days.value[0] || 1
-  } catch (cause) {
-    planError.value = cause.message
-  } finally {
-    planLoading.value = false
-  }
-}
 async function load() {
   await loadTrip()
-  if (!error.value) await loadPlan()
+  // 旅行加载完成后共享事件连接启动，成员和行程分别读取首次快照。
 }
 async function generate() {
   if (busy.value) return
@@ -101,12 +94,11 @@ async function generate() {
   try {
     // 使用服务端收集的旅行/成员提示词，不在浏览器生成行程。
     const prompt = await tripApi.prompt(tripId.value)
-    const id = asId(await itineraryApi.generate(tripId.value, prompt))
-    itineraryId.value = id
+    await itineraryApi.generate(tripId.value, prompt)
     tripStatusPending.value = true
     busyText.value = '行程已生成，正在确认旅行状态…'
     await syncTripStatus()
-    await loadPlan(id)
+    await loadPlan()
   } catch (cause) {
     actionError.value = cause.message
     await loadPlan()
@@ -135,7 +127,8 @@ async function retryTripStatus() {
   }
 }
 async function apply(messages) {
-  if (busy.value || !messages.length) return
+  if (busy.value || !messages.length || !itinerary.value) return
+  const targetId = itineraryId.value
   if (
     itinerary.value.status === 'confirmed' &&
     !(await confirmation.ask({
@@ -145,14 +138,18 @@ async function apply(messages) {
     }))
   )
     return
+  if (targetId !== itineraryId.value) {
+    actionError.value = '行程已被更新，请查看最新行程后重新采纳建议'
+    return
+  }
   busy.value = true
   actionError.value = ''
   busyText.value = 'AI 正在根据所选建议更新行程…'
   try {
     // 后端在事务内将建议标记为 applied，删除旧行程并返回新 ID；不能提前更改建议状态。
-    const id = asId(await itineraryApi.update(itineraryId.value, messages))
+    await itineraryApi.update(targetId, messages)
     notice.show('行程已更新，请查看新的草案')
-    await loadPlan(id)
+    await loadPlan()
     await suggestions.value?.load()
     await chat.value?.refresh()
   } catch (cause) {
@@ -164,8 +161,10 @@ async function apply(messages) {
   }
 }
 async function confirm() {
+  const targetId = itineraryId.value
   if (
     busy.value ||
+    !targetId ||
     !(await confirmation.ask({
       title: '准备按这份计划出发？',
       message: '确认后，这份行程将作为大家的出行安排。之后仍可通过 AI 建议调整，调整后需重新确认。',
@@ -173,11 +172,15 @@ async function confirm() {
     }))
   )
     return
+  if (targetId !== itineraryId.value) {
+    actionError.value = '行程已被更新，请查看最新行程后重新确认'
+    return
+  }
   busy.value = true
   actionError.value = ''
   busyText.value = '正在确认行程…'
   try {
-    await itineraryApi.confirm(itineraryId.value)
+    await itineraryApi.confirm(targetId)
     notice.show('行程已确认')
     await loadPlan()
   } catch (cause) {
@@ -227,6 +230,13 @@ onMounted(load)
             重试确认旅行状态
           </button>
         </div>
+        <p class="tiny muted" role="status">{{ planSyncStatus }}</p>
+        <div v-if="planSyncError" class="callout" role="status">
+          <p>行程更新失败，当前保留上次读取的内容：{{ planSyncError }}</p>
+          <button class="text-btn" :disabled="busy || planRefreshing" @click="loadPlan()">
+            重新同步
+          </button>
+        </div>
         <AsyncState :loading="planLoading" :error="planError" @retry="loadPlan()"
           ><section v-if="!itinerary" class="card card-pad empty-state">
             <div class="illustration">✦</div>
@@ -240,7 +250,9 @@ onMounted(load)
             </p>
             <button v-if="isOwner" class="btn" :disabled="busy" @click="generate">
               {{ busy ? '生成中…' : '✦ 生成 AI 行程' }}</button
-            ><button class="text-btn" :disabled="busy" @click="loadPlan()">刷新行程</button>
+            ><button class="text-btn" :disabled="busy || planRefreshing" @click="loadPlan()">
+              刷新行程
+            </button>
           </section>
           <template v-else
             ><section class="card card-pad">
@@ -255,7 +267,13 @@ onMounted(load)
             <section class="card card-pad">
               <div class="row between">
                 <h2 class="h3">每天怎么玩</h2>
-                <button class="text-btn tiny" :disabled="busy" @click="loadPlan()">刷新行程</button>
+                <button
+                  class="text-btn tiny"
+                  :disabled="busy || planRefreshing"
+                  @click="loadPlan()"
+                >
+                  刷新行程
+                </button>
               </div>
               <div class="day-tabs mt" aria-label="旅行天数">
                 <button
@@ -324,7 +342,7 @@ onMounted(load)
           ref="suggestions"
           :trip-id="tripId"
           :busy="busy"
-          :can-apply="!!itinerary && !planError && !planLoading"
+          :can-apply="!!itinerary && !planError && !planSyncError && !planLoading"
           @apply="apply"
           @ignored="onIgnored"
         />

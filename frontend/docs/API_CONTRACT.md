@@ -33,7 +33,8 @@
 | 生成上下文  | GET `/trip/getPrompt`                       | Query：tripId；返回后端综合的旅行/成员提示词                                                                                                         |
 | 生成行程    | POST `/itinerary/add`                       | JSON：tripId、initItineraryPrompt；仅发起人；返回行程 ID                                                                                             |
 | 查找行程 ID | GET `/itinerary/getIdByTripId`              | Query：tripId；不存在行程时返回 null                                                                                                                 |
-| 行程详情    | GET `/itinerary/get`                        | Query：id；返回 ItineraryVO 和 itineraryItemVOList，无行程自身 ID                                                                                    |
+| 行程详情（旧接口） | GET `/itinerary/get`                  | Query：id；返回 ItineraryVO 和 itineraryItemVOList                                                                                                  |
+| 当前行程快照 | GET `/itinerary/getByTripId`               | Query：tripId；登录且已加入成员可查；返回包含 id、tripId、itineraryItemVOList 的 ItineraryVO，无行程返回 null；Cache-Control: no-store                    |
 | 采纳并修改  | PUT `/itinerary/update`                     | JSON：id、messageList（AI 消息原文）；返回新行程 ID                                                                                                  |
 | 确认行程    | PUT `/itinerary/confirmed`                  | **Query：id**，无 JSON 请求体；返回更新条数                                                                                                          |
 
@@ -57,7 +58,7 @@
 3. `trip/page` 返回 `List<TripPageVO>`，不是 `{ records, total }`。前端按页大小决定是否可翻下一页，恰好一整页时允许下一页为空。
 4. 没有旅行的用户在 `TripMemberServiceImpl.getTripIdsByUserId` 抛出 `40000 / 该用户不存在旅行信息`；另有 `40400 / 不存在旅行信息` 分支。前端仅将这两种明确响应转为空列表，不吞掉其他 40000 或权限错误。
 5. 没有邀请码返回 `40400 / 该旅行没有邀请码`；没有建议返回 `40400 / ai消息列表为空`。各自按空状态展示。
-6. `getIdByTripId` 没有行程返回成功且 data=null。`itinerary/get` 则会对没有明细的行程报错，前端保留该错误而非伪造时间线。
+6. 行程页现使用 `getByTripId` 一次读取当前行程和明细，没有行程返回成功且 data=null；服务端在同一只读事务内读取完整快照。旧 `getIdByTripId` 与 `itinerary/get` 保留兼容，行程页不再串联调用它们。
 7. OpenAPI 同时列出 form 与 JSON 的接口，实际使用 `@RequestBody` 的均发送 `application/json`；GET 和 confirmed 使用 Query 参数。
 
 ## 后端需补充或修正的问题
@@ -97,6 +98,8 @@ AI 回复和重试仅传递 `tripId`、`replyToId`，不查询或传递 `itinera
 暂无消息推送、撤回、直接编辑明细、邀请历史、手动到期时间、旅行/账号删除接口；未用模拟按钮替代。
 
 ## 精度与错误处理
+
+成员与行程共用 `GET /trip/{tripId}/events` SSE 连接，携带 Session Cookie。`trip.members.changed` 触发成员查询，`trip.itinerary.changed` 触发行程快照查询；事件 data 中的 tripId 为字符串。`trip.access.revoked` 关闭连接并清除旅行显示。没有注册监听的业务事件不会导致连接断开。事件不重放，前端在连接打开、页面恢复可见和网络恢复后补查，前台每 30 秒兜底同步。行程创建、替换、确认均在事务提交后通知；具体生命周期见 [行程自动同步](ITINERARY_REALTIME.md)。
 
 响应在 Axios transformResponse 中使用 lossless-json，防止原生 JSON.parse 提前损失 Long 精度。ID 字段统一转为字符串；所有 DTO 中 Long 参数传字符串；不会把雪花 ID 转成 Number。接口联调已验证 Jackson 接受这些字符串 Long。
 
