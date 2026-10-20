@@ -4,6 +4,8 @@
 
 当前用户查询：GET `/user/get`，无参数，返回 Session 对应的 LoginUserVO，未登录返回 40100。
 
+群聊增量查询：GET `/tripMessage/latest`，Query 为 `tripId`、`pageSize`（默认30，1–50）、成对传入的可选 `lastCreateTime` 和 `lastId`。按 `(createTime, id)` 严格大于游标、升序返回消息数组；无游标从最早消息开始。旧消息状态补查使用 GET `/tripMessage/byIds`，Query 为 `tripId` 和逗号分隔的 `ids`（最多50个）。两个接口仅限已加入成员，详见 [群聊增量同步](CHAT_REALTIME.md)。
+
 旅行状态更新：POST `/trip/updateStatus`，JSON `{ id, status }`，status 使用 confirmed 或 cancelled；仅发起人，返回 boolean，前端严格要求 true。
 
 ## 页面到 API 的映射

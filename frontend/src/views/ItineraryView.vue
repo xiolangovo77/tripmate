@@ -37,6 +37,7 @@ const tripStatusError = ref('')
 const tripStatusPending = ref(false)
 const busyText = ref('')
 const day = ref(1)
+const detailsExpanded = ref(true)
 const {
   itinerary,
   itineraryId,
@@ -265,55 +266,76 @@ onMounted(load)
               <p class="callout pre-wrap">{{ itinerary.summary }}</p>
             </section>
             <section class="card card-pad">
-              <div class="row between">
+              <div class="row between wrap">
                 <h2 class="h3">每天怎么玩</h2>
-                <button
-                  class="text-btn tiny"
-                  :disabled="busy || planRefreshing"
-                  @click="loadPlan()"
-                >
-                  刷新行程
-                </button>
+                <div class="row">
+                  <button
+                    type="button"
+                    class="text-btn tiny"
+                    :disabled="busy || planRefreshing"
+                    @click="loadPlan()"
+                  >
+                    刷新行程
+                  </button>
+                  <button
+                    type="button"
+                    class="text-btn tiny"
+                    :aria-expanded="detailsExpanded"
+                    aria-controls="itinerary-details"
+                    @click="detailsExpanded = !detailsExpanded"
+                  >
+                    {{ detailsExpanded ? '收起行程明细' : '展开行程明细' }}
+                    <span aria-hidden="true">{{ detailsExpanded ? '▴' : '▾' }}</span>
+                  </button>
+                </div>
               </div>
-              <div class="day-tabs mt" aria-label="旅行天数">
-                <button
-                  v-for="d in days"
-                  :key="d"
-                  :class="{ active: day === d }"
-                  :aria-pressed="day === d"
-                  @click="day = d"
-                >
-                  第 {{ d }} 天
-                  <small v-if="trip.departureDate">{{ dayDate(trip.departureDate, d) }}</small>
-                </button>
-              </div>
-              <Transition name="day" mode="out-in"
-                ><div :key="day" class="event-list">
-                  <article v-for="event in events" :key="event.id" class="event">
-                    <span class="event-dot" />
-                    <div class="time">
-                      {{ event.startTime?.slice(0, 5) || '待定' }}<br /><span
-                        v-if="event.endTime"
-                        class="tiny"
-                        >{{ event.endTime.slice(0, 5) }}</span
-                      >
-                    </div>
-                    <div class="event-content">
-                      <div class="row between wrap">
-                        <strong>{{ event.activityName }}</strong
-                        ><span class="cost">{{ money(event.estimatedCostPerPerson) }}</span>
+              <p v-if="!detailsExpanded" class="tiny muted">
+                已收起 {{ days.length }} 天、{{
+                  itinerary.itineraryItemVOList?.length || 0
+                }}
+                项活动， 展开后查看每日安排。
+              </p>
+              <div id="itinerary-details" v-show="detailsExpanded">
+                <div class="day-tabs mt" aria-label="旅行天数">
+                  <button
+                    v-for="d in days"
+                    :key="d"
+                    :class="{ active: day === d }"
+                    :aria-pressed="day === d"
+                    @click="day = d"
+                  >
+                    第 {{ d }} 天
+                    <small v-if="trip.departureDate">{{ dayDate(trip.departureDate, d) }}</small>
+                  </button>
+                </div>
+                <Transition name="day" mode="out-in"
+                  ><div :key="day" class="event-list">
+                    <article v-for="event in events" :key="event.id" class="event">
+                      <span class="event-dot" />
+                      <div class="time">
+                        {{ event.startTime?.slice(0, 5) || '待定' }}<br /><span
+                          v-if="event.endTime"
+                          class="tiny"
+                          >{{ event.endTime.slice(0, 5) }}</span
+                        >
                       </div>
-                      <p>⌖ {{ event.locationName || '地点待定' }}</p>
-                      <p v-if="event.address">{{ event.address }}</p>
-                      <div class="tiny pre-wrap">{{ event.description }}</div>
-                      <span v-if="event.activityType" class="badge mt">{{
-                        event.activityType
-                      }}</span>
-                    </div>
-                  </article>
-                </div></Transition
-              >
-              <div v-if="!events.length" class="empty-state muted">当天暂无活动安排</div>
+                      <div class="event-content">
+                        <div class="row between wrap">
+                          <strong>{{ event.activityName }}</strong
+                          ><span class="cost">{{ money(event.estimatedCostPerPerson) }}</span>
+                        </div>
+                        <p>⌖ {{ event.locationName || '地点待定' }}</p>
+                        <p v-if="event.address">{{ event.address }}</p>
+                        <div class="tiny pre-wrap">{{ event.description }}</div>
+                        <span v-if="event.activityType" class="badge mt">{{
+                          event.activityType
+                        }}</span>
+                      </div>
+                    </article>
+                  </div></Transition
+                >
+                <div v-if="!events.length" class="empty-state muted">当天暂无活动安排</div>
+              </div>
               <div class="divider" />
               <div class="row between">
                 <div>
@@ -352,6 +374,7 @@ onMounted(load)
         <TripChat
           ref="chat"
           :trip-id="tripId"
+          :events="tripEvents"
           :members="trip.tripMembers"
           @changed="suggestions?.load()"
         />

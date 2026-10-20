@@ -10,6 +10,7 @@ import com.ecnu.tripmate.ai.model.ItineraryResult;
 import com.ecnu.tripmate.ai.model.MessageResponseResult;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.event.TripSuggestionsChangedEvent;
+import com.ecnu.tripmate.event.TripMessagesChangedEvent;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.entity.Trip;
 import com.ecnu.tripmate.model.entity.TripMember;
@@ -138,6 +139,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
     }
 
     @Override
+    @Transactional
     public long add(Long tripId, String content, Long replyToId, User loginUser) {
         // 1、参数校验
         if(tripId <= 0){
@@ -185,6 +187,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if(!saveResult){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "消息添加失败，数据库错误");
         }
+        eventPublisher.publishEvent(new TripMessagesChangedEvent(tripId));
         return tripMessage.getId();
     }
 
@@ -253,6 +256,48 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         List<TripMessage> records = page.getRecords();
         List<TripMessageVO> tripMessageVOList = BeanUtil.copyToList(records, TripMessageVO.class);
         return tripMessageVOList;
+    }
+
+    @Override
+    public List<TripMessageVO> latest(Long tripId, int pageSize, LocalDateTime lastCreateTime,
+                                      Long lastId, User loginUser) {
+        if (pageSize < 1 || pageSize > 50) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "页面大小不合法");
+        }
+        if ((lastCreateTime == null) != (lastId == null) || (lastId != null && lastId <= 0)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "联合游标不合法");
+        }
+        checkMessageAccess(tripId, loginUser);
+        QueryWrapper query = QueryWrapper.create().eq("tripId", tripId);
+        if (lastCreateTime != null) {
+            query.and("(createTime > ? OR (createTime = ? AND id > ?))",
+                    lastCreateTime, lastCreateTime, lastId);
+        }
+        // 必须从游标后的第一条开始升序读取，不能倒序截取最新一批而跳过中间消息。
+        query.orderBy("createTime", true).orderBy("id", true).limit(pageSize);
+        return BeanUtil.copyToList(mapper.selectListByQuery(query), TripMessageVO.class);
+    }
+
+    @Override
+    public List<TripMessageVO> getByIds(Long tripId, List<Long> ids, User loginUser) {
+        if (ids == null || ids.isEmpty() || ids.size() > 50
+                || ids.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "消息ids不合法，每次最多50条");
+        }
+        checkMessageAccess(tripId, loginUser);
+        QueryWrapper query = QueryWrapper.create().eq("tripId", tripId).in("id", ids)
+                .orderBy("createTime", true).orderBy("id", true);
+        return BeanUtil.copyToList(mapper.selectListByQuery(query), TripMessageVO.class);
+    }
+
+    private void checkMessageAccess(Long tripId, User loginUser) {
+        if (tripId == null || tripId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
+        }
+        if (loginUser == null || loginUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        tripMemberService.checkMemberAccess(tripId, loginUser.getId());
     }
 
     @Override
@@ -335,6 +380,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if(!saveResult){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "保存ai消息失败，数据库错误");
         }
+        eventPublisher.publishEvent(new TripMessagesChangedEvent(tripId));
         if (!TripMessageChangeStatusEnum.NONE.getValue().equals(changeStatus)) {
             eventPublisher.publishEvent(new TripSuggestionsChangedEvent(tripId));
         }

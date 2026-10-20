@@ -54,6 +54,15 @@ public interface TripMessageService extends IService<TripMessage> {
     List<TripMessageVO> page(Long tripId, int pageSize, LocalDateTime lastCreateTime, Long lastId, User loginUser);
 
     /**
+     * 增量读取联合游标之后的消息，按createTime、id升序返回，每批1至50条。
+     * 游标成对传入；无游标时从最早消息开始，无新消息时返回空列表。
+     */
+    List<TripMessageVO> latest(Long tripId, int pageSize, LocalDateTime lastCreateTime, Long lastId, User loginUser);
+
+    /** 按ID补查同一旅行内的消息，每批最多50条，仅限已加入成员。 */
+    List<TripMessageVO> getByIds(Long tripId, List<Long> ids, User loginUser);
+
+    /**
      * 添加ai消息
      * @param tripId 旅行id
      * @param replyToId 用户消息id

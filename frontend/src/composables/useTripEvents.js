@@ -97,7 +97,7 @@ export function useTripEvents({ tripId, enabled, onAccessLost }) {
         if (epoch !== connectionEpoch) return
         state.value = 'connected'
         retryDelay = 3000
-        // SSE不重放遗漏事件，重连后让所有已订阅业务重新读取快照。
+        // SSE不重放遗漏事件，重连后让各业务补查快照或增量消息。
         syncAll()
       }
       for (const eventName of handlers.keys()) attach(eventName)

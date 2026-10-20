@@ -90,6 +90,26 @@ public class TripMessageController {
         return ResultUtils.success(tripMessageVOList);
     }
 
+    /** 按创建时间、ID升序读取游标之后的新消息；无游标时从最早消息开始。 */
+    @GetMapping("latest")
+    public BaseResponse<List<TripMessageVO>> latest(@RequestParam Long tripId,
+                                                   @RequestParam(defaultValue = "30") int pageSize,
+                                                   @RequestParam(required = false) LocalDateTime lastCreateTime,
+                                                   @RequestParam(required = false) Long lastId,
+                                                   HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(tripMessageService.latest(tripId, pageSize, lastCreateTime, lastId, loginUser));
+    }
+
+    /** 补查已加载消息的当前状态，不改变新消息游标。 */
+    @GetMapping("byIds")
+    public BaseResponse<List<TripMessageVO>> byIds(@RequestParam Long tripId,
+                                                  @RequestParam List<Long> ids,
+                                                  HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(tripMessageService.getByIds(tripId, ids, loginUser));
+    }
+
     /**
      * 添加ai消息
      * @param tripMessageAddAiRequest 用户信息请求

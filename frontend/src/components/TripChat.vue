@@ -1,25 +1,27 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch, useId } from 'vue'
+import { computed, nextTick, ref, toRef, watch, useId } from 'vue'
 import { messageApi } from '../api/message.js'
+import { useTripMessages } from '../composables/useTripMessages.js'
 import { useAuthStore } from '../stores/auth.js'
 import { asId } from '../utils/json.js'
 import { changeNames, dateTime, mentionsAi, sameId } from '../utils/format.js'
 const props = defineProps({
   tripId: { type: String, required: true },
+  events: { type: Object, required: true },
   members: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['changed'])
 const auth = useAuthStore()
-const messages = ref([])
 const text = ref('')
-const loading = ref(false)
 const sending = ref(false)
 const aiBusy = ref(false)
-const error = ref('')
 const sendError = ref('')
-const hasMore = ref(false)
-const cursor = ref(null)
 const log = ref(null)
+const { messages, loading, error, hasMore, refresh, loadOlder, syncStatus } = useTripMessages({
+  tripId: toRef(props, 'tripId'),
+  events: props.events,
+  log,
+})
 const retryAiId = ref(null)
 const stage = ref('')
 const composer = ref(null)
@@ -45,49 +47,6 @@ watch(text, async () => {
   composer.value.style.height = 'auto'
   composer.value.style.height = `${Math.min(composer.value.scrollHeight, 200)}px`
 })
-function compareMessages(a, b) {
-  const timeOrder = String(a.createTime).localeCompare(String(b.createTime))
-  if (timeOrder) return timeOrder
-  // 与后端的数值ID排序一致，避免字符串排序或Number转换造成顺序、精度错误。
-  const left = BigInt(asId(a.id))
-  const right = BigInt(asId(b.id))
-  return left < right ? -1 : left > right ? 1 : 0
-}
-const sorted = computed(() => [...messages.value].sort(compareMessages))
-function merge(incoming) {
-  const byId = new Map(messages.value.map((item) => [String(item.id), item]))
-  for (const item of incoming) byId.set(String(item.id), item)
-  messages.value = [...byId.values()]
-}
-async function refresh(older = false) {
-  if (loading.value || (older && (!hasMore.value || !cursor.value))) return
-  loading.value = true
-  error.value = ''
-  const oldHeight = log.value?.scrollHeight || 0
-  const oldTop = log.value?.scrollTop || 0
-  try {
-    const batch = await messageApi.page(props.tripId, older ? cursor.value : undefined)
-    // 后端按createTime、id降序返回，末条消息的两个字段必须作为同一组游标。
-    const oldest = batch.at(-1)
-    const nextCursor = oldest
-      ? { lastCreateTime: oldest.createTime, lastId: asId(oldest.id) }
-      : null
-    if (older) merge(batch)
-    else messages.value = batch
-    // 刷新从最新一页重新建立游标，避免两次刷新间超过一页消息时漏掉中间记录。
-    hasMore.value = batch.length === 30
-    cursor.value = nextCursor
-    await nextTick()
-    if (log.value)
-      log.value.scrollTop = older
-        ? log.value.scrollHeight - oldHeight + oldTop
-        : log.value.scrollHeight
-  } catch (cause) {
-    error.value = cause.message
-  } finally {
-    loading.value = false
-  }
-}
 function sender(message) {
   if (message.role === 'assistant') return '✦ AI 旅行搭子'
   return (
@@ -135,8 +94,8 @@ async function retryAi() {
   const id = retryAiId.value
   sendError.value = ''
   // 超时可能已经落库，先查询回复，避免盲目重发用户消息或 AI 请求。
-  await refresh()
-  if (error.value) {
+  const synced = await refresh()
+  if (!synced) {
     sendError.value = '暂时无法核对回复，请恢复连接后重试'
     return
   }
@@ -147,7 +106,6 @@ async function retryAi() {
   }
   await askAi(id)
 }
-onMounted(() => refresh())
 defineExpose({ refresh })
 </script>
 <template>
@@ -160,6 +118,7 @@ defineExpose({ refresh })
     </div>
     <p class="tiny muted">好行程，从聊聊各自的期待开始。</p>
     <p class="tiny muted">@AI 会结合旅行信息和已有的问答记忆回复。</p>
+    <p class="tiny muted" role="status">{{ syncStatus }}</p>
     <div v-if="error" class="err" role="alert">{{ error }}</div>
     <div
       ref="log"
@@ -169,7 +128,7 @@ defineExpose({ refresh })
       aria-live="polite"
       tabindex="0"
     >
-      <button v-if="hasMore" class="text-btn tiny" :disabled="loading" @click="refresh(true)">
+      <button v-if="hasMore" class="text-btn tiny" :disabled="loading" @click="loadOlder">
         加载更早的消息
       </button>
       <div v-if="!messages.length" class="chat-empty">
@@ -180,7 +139,7 @@ defineExpose({ refresh })
         </p>
       </div>
       <article
-        v-for="message in sorted"
+        v-for="message in messages"
         :key="message.id"
         class="chat"
         :class="

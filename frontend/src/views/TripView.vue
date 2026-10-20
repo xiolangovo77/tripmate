@@ -39,6 +39,7 @@ const {
   refreshMembers,
   memberSyncStatus,
   memberSyncError,
+  tripEvents,
 } = useTrip(route)
 const inviteOpen = ref(false)
 const editOpen = ref(false)
@@ -207,7 +208,7 @@ onMounted(load)
           </div>
           <p v-if="leaveError" class="err" role="alert">{{ leaveError }}</p>
         </section>
-        <TripChat :trip-id="tripId" :members="trip.tripMembers" />
+        <TripChat :trip-id="tripId" :events="tripEvents" :members="trip.tripMembers" />
       </div>
       <aside class="stack side-aside">
         <section class="card card-pad">
