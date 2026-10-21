@@ -21,6 +21,8 @@ export function useTripMessages({ tripId, events, log }) {
   const loading = ref(false)
   const error = ref('')
   const hasMore = ref(false)
+  const referencedMessages = ref(new Map())
+  const referenceError = ref('')
   let ready = false
   let newest = null
   let oldest = null
@@ -121,6 +123,38 @@ export function useTripMessages({ tripId, events, log }) {
               merge(updates, 'update', requestEpoch)
             }
           }
+
+          // 引用可能在尚未加载的历史分页中；单独保存，避免打乱聊天列表和游标。
+          const loadedIds = new Set(messages.value.map((item) => item.id))
+          const referenceIds = [
+            ...new Set(
+              messages.value
+                .filter(
+                  (item) =>
+                    item.role === 'assistant' && item.recallStatus !== 'recalled' && item.replyToId,
+                )
+                .map((item) => asId(item.replyToId)),
+            ),
+          ].filter((replyId) => !loadedIds.has(replyId))
+          const references = new Map()
+          try {
+            for (let offset = 0; offset < referenceIds.length; offset += 50) {
+              const batch = await messageApi.byIds(
+                id,
+                referenceIds.slice(offset, offset + 50),
+                config,
+              )
+              if (!current()) return false
+              for (const item of batch) references.set(asId(item.id), item)
+            }
+            referencedMessages.value = references
+            referenceError.value = ''
+          } catch (cause) {
+            if (!current()) return false
+            if (events.handleAccessError(cause)) return false
+            referencedMessages.value = references
+            referenceError.value = '原消息暂时无法加载，请刷新消息重试'
+          }
         } while (dirty || statusesDirty || historyDirty)
         error.value = ''
         return true
@@ -154,6 +188,8 @@ export function useTripMessages({ tripId, events, log }) {
       if (!active || id !== previousId) cancel()
       if (id !== previousId) {
         messages.value = []
+        referencedMessages.value = new Map()
+        referenceError.value = ''
         error.value = ''
         hasMore.value = false
         ready = false
@@ -173,6 +209,11 @@ export function useTripMessages({ tripId, events, log }) {
 
   return {
     messages,
+    replySources: computed(
+      () =>
+        new Map([...referencedMessages.value, ...messages.value.map((item) => [item.id, item])]),
+    ),
+    referenceError,
     loading,
     error,
     hasMore,

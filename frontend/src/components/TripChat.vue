@@ -18,7 +18,17 @@ const aiBusy = ref(false)
 const sendError = ref('')
 const needsItinerary = ref(false)
 const log = ref(null)
-const { messages, loading, error, hasMore, refresh, loadOlder, syncStatus } = useTripMessages({
+const {
+  messages,
+  replySources,
+  referenceError,
+  loading,
+  error,
+  hasMore,
+  refresh,
+  loadOlder,
+  syncStatus,
+} = useTripMessages({
   tripId: toRef(props, 'tripId'),
   events: props.events,
   log,
@@ -28,6 +38,12 @@ const stage = ref('')
 const composer = ref(null)
 const composerId = useId()
 const withAi = computed(() => mentionsAi(text.value))
+const chatMessages = computed(() =>
+  messages.value.map((message) => ({
+    ...message,
+    replySource: message.replyToId ? replySources.value.get(String(message.replyToId)) : null,
+  })),
+)
 function fillPrompt(prompt) {
   text.value = text.value.trim() ? `${text.value}\n${prompt}` : prompt
   nextTick(() => composer.value?.focus())
@@ -147,7 +163,7 @@ defineExpose({ refresh })
         </p>
       </div>
       <article
-        v-for="message in messages"
+        v-for="message in chatMessages"
         :key="message.id"
         class="chat"
         :class="
@@ -162,6 +178,28 @@ defineExpose({ refresh })
           <strong>{{ sender(message) }}</strong
           ><time>{{ dateTime(message.createTime) }}</time>
         </div>
+        <blockquote
+          v-if="
+            message.role === 'assistant' && message.replyToId && message.recallStatus !== 'recalled'
+          "
+          class="chat-reply"
+          aria-label="回复的原消息"
+        >
+          <strong class="chat-reply-author">{{
+            message.replySource ? `回复 ${sender(message.replySource)}` : '回复原消息'
+          }}</strong>
+          <div class="chat-reply-content" tabindex="0">
+            {{
+              message.replySource
+                ? message.replySource.recallStatus === 'recalled'
+                  ? '原消息已撤回'
+                  : message.replySource.content
+                : loading
+                  ? '正在加载原消息…'
+                  : referenceError || '原消息已不存在或无法查看'
+            }}
+          </div>
+        </blockquote>
         <div>{{ message.recallStatus === 'recalled' ? '消息已撤回' : message.content }}</div>
         <span
           v-if="message.role === 'assistant' && message.changeStatus !== 'none'"
@@ -173,7 +211,9 @@ defineExpose({ refresh })
     <div v-if="stage" class="callout" role="status"><span class="spinner" /> {{ stage }}</div>
     <div v-if="needsItinerary" class="callout chat-feedback" role="status">
       <strong>先生成行程，再和 AI 聊聊吧</strong>
-      <span>你的消息已保存。当前旅行还没有行程，请由发起人在「AI 行程」页面生成后，再 @AI 提问。</span>
+      <span
+        >你的消息已保存。当前旅行还没有行程，请由发起人在「AI 行程」页面生成后，再 @AI 提问。</span
+      >
       <RouterLink class="text-btn" :to="`/trips/${tripId}/itinerary`">前往 AI 行程 →</RouterLink>
     </div>
     <div v-if="sendError" class="err chat-feedback" role="alert">
@@ -233,6 +273,26 @@ defineExpose({ refresh })
 </template>
 
 <style scoped>
+.chat-reply {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border-left: 3px solid #7fa88d;
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.65);
+  color: #496651;
+  font-size: 12px;
+  white-space: normal;
+}
+.chat-reply-author {
+  display: block;
+  margin-bottom: 4px;
+}
+.chat-reply-content {
+  max-height: 8em;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .chat-feedback {
   display: flex;
   flex-direction: column;
