@@ -312,7 +312,12 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         }
         // 2、判断旅行是否存在
         tripService.isTripExists(tripId);
-        // 3、判断该用户是否是该旅行的成员
+        // 3、判断行程是否存在
+        Long itineraryId = itineraryService.getIdByTripId(tripId);
+        if(itineraryId == null || itineraryId <=0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "行程不存在");
+        }
+        // 4、判断该用户是否是该旅行的成员
         Long userId = loginUser.getId();
         QueryWrapper queryWrapper = new QueryWrapper();
         queryWrapper.eq("tripId", tripId)
@@ -321,42 +326,41 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if(count <= 0){
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有该旅行的成员才能查询消息");
         }
-        // 4、判断用户消息是否存在
+        // 5、判断用户消息是否存在
         TripMessage tripMessage = this.getById(replyToId);
         if(tripMessage == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户消息不存在");
         }
-        // 5、消息是否撤回
+        // 6、消息是否撤回
         String recallStatus = tripMessage.getRecallStatus();
         if(TripMessageRecallStatusEnum.RECALLED.getValue().equals(recallStatus)){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户消息已撤回");
         }
-        // 6、登录用户是否为发消息本人
+        // 7、登录用户是否为发消息本人
         long senderId = tripMessage.getSenderId();
         if(senderId != userId){
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
-        // 7、获取旅行和旅行成员信息
+        // 8、获取旅行和旅行成员信息
         StringBuilder prompt = new StringBuilder();
         String tripAndTripMemberInfos = tripService.getInitItineraryPrompt(tripId);
         prompt.append(tripAndTripMemberInfos);
-        // 8、获取行程和行程明细信息
-        Long itineraryId = itineraryService.getIdByTripId(tripId);
+        // 9、获取行程和行程明细信息
         ItineraryVO itineraryVO = itineraryService.get(itineraryId);
         String itineraryInfos = itineraryService.getItineraryInfosPrompt(itineraryVO);
         prompt.append(itineraryInfos);
-        // 9、获取用户发送的消息
+        // 10、获取用户发送的消息
         String nickname = loginUser.getNickname();
         String userContent = tripMessage.getContent();
         String userMessage = String.format("以下是旅行群聊中用户发送的消息，请结合用户的需求进行回复。\n用户昵称：%s\n消息内容：%s", nickname, userContent);
         prompt.append(userMessage);
-        // 10、调用ai
+        // 11、调用ai
         AiItineraryGeneratorService aiItineraryGeneratorService = aiItineraryGeneratorServiceFactory.getAiItineraryGeneratorService(tripId);
         MessageResponseResult messageResponseResult = aiItineraryGeneratorService.messageResponse(prompt.toString());
         if(messageResponseResult == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI调用失败，请重试");
         }
-        // 11、ai返回结果校验
+        // 12、ai返回结果校验
         String content = messageResponseResult.getContent();
         String changeStatus = messageResponseResult.getChangeStatus();
         if(StrUtil.hasBlank(content, changeStatus)){
@@ -365,7 +369,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if(TripMessageChangeStatusEnum.getEnumByValue(changeStatus) == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI调用失败，请重试");
         }
-        // 12、添加ai消息
+        // 13、添加ai消息
         String role = TripMessageRoleEnum.ASSISTANT.getValue();
         String recallStatusAi = TripMessageRecallStatusEnum.NORMAL.getValue();
         TripMessage tripAiMessage = TripMessage.builder()
@@ -412,8 +416,8 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
                 .eq("role", role)
                 .orderBy("createTime", true);
         List<TripMessage> tripMessageAiList = this.mapper.selectListByQuery(queryWrapper1);
-        if(tripMessageAiList == null || tripMessageAiList.isEmpty()){
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "ai消息列表为空");
+        if(tripMessageAiList == null){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "ai消息列表查找失败，数据库错误");
         }
         // 5、返回VO
         List<TripMessageAiVO> TripMessageAiVOList = BeanUtil.copyToList(tripMessageAiList, TripMessageAiVO.class);

@@ -16,6 +16,7 @@ const text = ref('')
 const sending = ref(false)
 const aiBusy = ref(false)
 const sendError = ref('')
+const needsItinerary = ref(false)
 const log = ref(null)
 const { messages, loading, error, hasMore, refresh, loadOlder, syncStatus } = useTripMessages({
   tripId: toRef(props, 'tripId'),
@@ -57,13 +58,18 @@ function sender(message) {
 async function askAi(id) {
   aiBusy.value = true
   retryAiId.value = null
+  needsItinerary.value = false
   stage.value = 'AI 正在整理想法，请稍候…'
   try {
     await messageApi.ai(props.tripId, id)
     emit('changed')
   } catch (cause) {
-    retryAiId.value = id
-    sendError.value = `你的消息已保存。AI 请求未完成：${cause.message}`
+    if (cause.message === '行程不存在') {
+      needsItinerary.value = true
+    } else {
+      retryAiId.value = id
+      sendError.value = `你的消息已保存。AI 暂时未能回复：${cause.message}`
+    }
   } finally {
     aiBusy.value = false
     stage.value = ''
@@ -75,6 +81,8 @@ async function send() {
   if (!content || sending.value || aiBusy.value) return
   sending.value = true
   sendError.value = ''
+  needsItinerary.value = false
+  retryAiId.value = null
   try {
     const id = asId(await messageApi.add(props.tripId, content))
     text.value = ''
@@ -163,15 +171,20 @@ defineExpose({ refresh })
       </article>
     </div>
     <div v-if="stage" class="callout" role="status"><span class="spinner" /> {{ stage }}</div>
-    <div v-if="sendError" class="err" role="alert">
-      {{ sendError
-      }}<button
+    <div v-if="needsItinerary" class="callout chat-feedback" role="status">
+      <strong>先生成行程，再和 AI 聊聊吧</strong>
+      <span>你的消息已保存。当前旅行还没有行程，请由发起人在「AI 行程」页面生成后，再 @AI 提问。</span>
+      <RouterLink class="text-btn" :to="`/trips/${tripId}/itinerary`">前往 AI 行程 →</RouterLink>
+    </div>
+    <div v-if="sendError" class="err chat-feedback" role="alert">
+      <span>{{ sendError }}</span>
+      <button
         v-if="retryAiId"
         class="text-btn"
         :disabled="aiBusy || sending || loading"
         @click="retryAi"
       >
-        核对并重试 AI
+        重试 AI 回复
       </button>
     </div>
     <div v-if="!messages.length && !loading" class="chat-prompts">
@@ -218,3 +231,13 @@ defineExpose({ refresh })
     </form>
   </section>
 </template>
+
+<style scoped>
+.chat-feedback {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.7;
+}
+</style>
