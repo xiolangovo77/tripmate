@@ -18,6 +18,7 @@
 
 - `GET /api/trip/{tripId}/events`：SSE；登录且处于 joined 状态的成员才能订阅。使用与普通 API 相同的前缀配置。
 - `GET /api/trip/{tripId}/members`：成员快照；同样检查登录和成员权限，返回现有 `{code, data, message}` 结构，data 为成员数组。
+- 成员对象包含 `avatarUrl`，按成员用户 ID 从 `user` 表批量读取当前头像；旅行详情的 `tripMembers` 使用相同转换逻辑。成员昵称仍使用 `trip_member.nickname`，不新增数据库字段。前端头像加载失败或未设置时显示昵称首字，后续成员快照查询会带回最新头像。
 - `trip.members.changed`：要求重新查询成员快照。data 中的 tripId 是字符串，避免雪花 ID 精度损失。
 - `trip.access.revoked`：成员已退出或旅行不存在，客户端关闭连接并清除当前旅行显示。
 

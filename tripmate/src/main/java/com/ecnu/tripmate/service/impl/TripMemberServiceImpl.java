@@ -18,6 +18,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.ecnu.tripmate.model.entity.TripMember;
 import com.ecnu.tripmate.mapper.TripMemberMapper;
+import com.ecnu.tripmate.mapper.UserMapper;
 import com.ecnu.tripmate.service.TripMemberService;
 import jakarta.annotation.Resource;
 import lombok.NonNull;
@@ -30,6 +31,10 @@ import com.ecnu.tripmate.event.TripMembersChangedEvent;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 旅行成员表 服务层实现。
@@ -47,6 +52,9 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
     private TripInvitationService tripInvitationService;
 
     @Resource
+    private UserMapper userMapper;
+
+    @Resource
     private ApplicationEventPublisher eventPublisher;
 
     @Override
@@ -57,7 +65,27 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
         if (current.stream().noneMatch(member -> member.getUserId().equals(userId))) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "你已不在此旅行小队中");
         }
-        return BeanUtil.copyToList(current, TripMemberVO.class);
+        return toMemberVOs(current);
+    }
+
+    @Override
+    public List<TripMemberVO> toMemberVOs(List<TripMember> members) {
+        List<TripMemberVO> result = BeanUtil.copyToList(members, TripMemberVO.class);
+        List<Long> userIds = members.stream().map(TripMember::getUserId)
+                .filter(Objects::nonNull).distinct().toList();
+        if (userIds.isEmpty()) {
+            return result;
+        }
+        Map<Long, User> users = userMapper.selectListByQuery(QueryWrapper.create()
+                        .select("id", "avatarUrl").in("id", userIds))
+                .stream().collect(Collectors.toMap(User::getId, Function.identity()));
+        for (TripMemberVO member : result) {
+            User user = users.get(member.getUserId());
+            if (user != null) {
+                member.setAvatarUrl(user.getAvatarUrl());
+            }
+        }
+        return result;
     }
 
     @Override

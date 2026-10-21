@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth.js'
 import { useNoticeStore } from '../stores/notice.js'
 import { useConfirmStore } from '../stores/confirm.js'
 import ModalDialog from '../components/ModalDialog.vue'
+import UserAvatar from '../components/UserAvatar.vue'
 const auth = useAuthStore()
 const notice = useNoticeStore()
 const confirmation = useConfirmStore()
@@ -65,9 +66,15 @@ async function logout() {
       </nav>
       <div class="nav-end">
         <template v-if="auth.user"
-          ><RouterLink class="user-name" to="/my-trips">{{
-            auth.user.nickname || auth.user.userAccount
-          }}</RouterLink
+          ><RouterLink
+            class="row"
+            :to="{ path: '/my-trips', query: { profile: 'edit' } }"
+            aria-label="编辑个人信息与偏好"
+          >
+            <UserAvatar :src="auth.user.avatarUrl" :name="auth.user.nickname" :size="32" />
+            <span class="user-name">{{
+              auth.user.nickname || auth.user.userAccount
+            }}</span></RouterLink
           ><button class="text-btn tiny" :disabled="leaving" @click="logout">
             {{ leaving ? '退出中…' : '退出' }}
           </button></template

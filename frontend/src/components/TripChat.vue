@@ -3,6 +3,7 @@ import { computed, nextTick, ref, toRef, watch, useId } from 'vue'
 import { messageApi } from '../api/message.js'
 import { useTripMessages } from '../composables/useTripMessages.js'
 import { useAuthStore } from '../stores/auth.js'
+import UserAvatar from './UserAvatar.vue'
 import { asId } from '../utils/json.js'
 import { changeNames, dateTime, mentionsAi, sameId } from '../utils/format.js'
 const props = defineProps({
@@ -68,8 +69,14 @@ function sender(message) {
   if (message.role === 'assistant') return '✦ AI 旅行搭子'
   return (
     props.members.find((member) => sameId(member.userId, message.senderId))?.nickname ||
+    message.senderNickname ||
+    (sameId(message.senderId, auth.user?.id) ? auth.user?.nickname : '') ||
     `成员 ${message.senderId}`
   )
+}
+function senderAvatar(message) {
+  if (sameId(message.senderId, auth.user?.id)) return auth.user?.avatarUrl || ''
+  return message.senderAvatarUrl || ''
 }
 async function askAi(id) {
   aiBusy.value = true
@@ -162,51 +169,68 @@ defineExpose({ refresh })
           {{ loading ? '马上就好' : '聊聊想吃的、想看的，或者让 AI 一起想。' }}
         </p>
       </div>
-      <article
+      <div
         v-for="message in chatMessages"
         :key="message.id"
-        class="chat"
-        :class="
-          message.role === 'assistant'
-            ? 'assistant'
-            : sameId(message.senderId, auth.user?.id)
-              ? 'user'
-              : 'peer'
-        "
+        class="chat-message-row"
+        :class="{
+          'is-self': message.role !== 'assistant' && sameId(message.senderId, auth.user?.id),
+        }"
       >
-        <div class="chat-meta">
-          <strong>{{ sender(message) }}</strong
-          ><time>{{ dateTime(message.createTime) }}</time>
-        </div>
-        <blockquote
-          v-if="
-            message.role === 'assistant' && message.replyToId && message.recallStatus !== 'recalled'
-          "
-          class="chat-reply"
-          aria-label="回复的原消息"
-        >
-          <strong class="chat-reply-author">{{
-            message.replySource ? `回复 ${sender(message.replySource)}` : '回复原消息'
-          }}</strong>
-          <div class="chat-reply-content" tabindex="0">
-            {{
-              message.replySource
-                ? message.replySource.recallStatus === 'recalled'
-                  ? '原消息已撤回'
-                  : message.replySource.content
-                : loading
-                  ? '正在加载原消息…'
-                  : referenceError || '原消息已不存在或无法查看'
-            }}
-          </div>
-        </blockquote>
-        <div>{{ message.recallStatus === 'recalled' ? '消息已撤回' : message.content }}</div>
         <span
-          v-if="message.role === 'assistant' && message.changeStatus !== 'none'"
-          class="chat-status"
-          >{{ changeNames[message.changeStatus] || message.changeStatus }}</span
+          v-if="message.role === 'assistant'"
+          class="chat-ai-avatar"
+          role="img"
+          aria-label="AI 旅行搭子头像"
+          >✦</span
         >
-      </article>
+        <UserAvatar v-else :src="senderAvatar(message)" :name="sender(message)" :size="36" />
+        <article
+          class="chat"
+          :class="
+            message.role === 'assistant'
+              ? 'assistant'
+              : sameId(message.senderId, auth.user?.id)
+                ? 'user'
+                : 'peer'
+          "
+        >
+          <div class="chat-meta">
+            <strong>{{ sender(message) }}</strong
+            ><time>{{ dateTime(message.createTime) }}</time>
+          </div>
+          <blockquote
+            v-if="
+              message.role === 'assistant' &&
+              message.replyToId &&
+              message.recallStatus !== 'recalled'
+            "
+            class="chat-reply"
+            aria-label="回复的原消息"
+          >
+            <strong class="chat-reply-author">{{
+              message.replySource ? `回复 ${sender(message.replySource)}` : '回复原消息'
+            }}</strong>
+            <div class="chat-reply-content" tabindex="0">
+              {{
+                message.replySource
+                  ? message.replySource.recallStatus === 'recalled'
+                    ? '原消息已撤回'
+                    : message.replySource.content
+                  : loading
+                    ? '正在加载原消息…'
+                    : referenceError || '原消息已不存在或无法查看'
+              }}
+            </div>
+          </blockquote>
+          <div>{{ message.recallStatus === 'recalled' ? '消息已撤回' : message.content }}</div>
+          <span
+            v-if="message.role === 'assistant' && message.changeStatus !== 'none'"
+            class="chat-status"
+            >{{ changeNames[message.changeStatus] || message.changeStatus }}</span
+          >
+        </article>
+      </div>
     </div>
     <div v-if="stage" class="callout" role="status"><span class="spinner" /> {{ stage }}</div>
     <div v-if="needsItinerary" class="callout chat-feedback" role="status">
@@ -273,6 +297,48 @@ defineExpose({ refresh })
 </template>
 
 <style scoped>
+.chat-message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  flex-shrink: 0;
+}
+.chat-message-row.is-self {
+  flex-direction: row-reverse;
+}
+.chat-message-row > .chat {
+  min-width: 0;
+  max-width: calc(100% - 46px);
+  align-self: auto;
+}
+.chat-message-row > .chat.assistant {
+  flex: 1;
+}
+.chat-message-row.is-self .chat-meta {
+  flex-direction: row-reverse;
+}
+.chat-ai-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 1px solid #dce6cf;
+  border-radius: 50%;
+  background: #e7efdb;
+  color: #46654e;
+  font-size: 22px;
+}
+@media (max-width: 600px) {
+  .chat-message-row {
+    gap: 8px;
+  }
+  .chat-message-row > .chat {
+    max-width: calc(100% - 44px);
+    padding: 10px 12px;
+  }
+}
 .chat-reply {
   margin: 8px 0 12px;
   padding: 8px 12px;

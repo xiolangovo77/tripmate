@@ -1,31 +1,39 @@
 <script setup>
 import { scheduleLabel, routeLabel } from '../utils/tripSchedule.js'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
-import { useNoticeStore } from '../stores/notice.js'
 import { tripApi } from '../api/trip.js'
 import { parseActivities, dateTime } from '../utils/format.js'
-import PreferenceFields from '../components/PreferenceFields.vue'
+import ProfileForm from '../components/ProfileForm.vue'
 import AsyncState from '../components/AsyncState.vue'
 import ModalDialog from '../components/ModalDialog.vue'
+import UserAvatar from '../components/UserAvatar.vue'
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
-const notice = useNoticeStore()
-const profile = reactive({
-  nickname: auth.user.nickname,
-  avatarUrl: auth.user.avatarUrl || '',
-  travelPace: auth.user.travelPace,
-  activities: parseActivities(auth.user.favoriteActivities),
-})
-const profileError = ref('')
 const saving = ref(false)
-const saved = ref(false)
 const profileOpen = ref(false)
+function openProfile() {
+  profileOpen.value = true
+}
+function closeProfile() {
+  if (saving.value) return
+  profileOpen.value = false
+}
+watch(
+  () => route.query.profile,
+  (value) => {
+    if (value !== 'edit') return
+    if (!profileOpen.value) openProfile()
+    // 消费打开指令，关闭后再次点击顶部头像仍可打开弹窗。
+    const query = { ...route.query }
+    delete query.profile
+    router.replace({ path: route.path, query, hash: route.hash })
+  },
+  { immediate: true },
+)
 const filterOpen = ref(false)
-watch(profile, () => {
-  saved.value = false
-})
 const trips = ref([])
 const loading = ref(false)
 const error = ref('')
@@ -46,30 +54,6 @@ const filterCount = computed(() => Object.values(filters).filter((value) => valu
 function resetFilters() {
   for (const key of Object.keys(filters)) filters[key] = ''
   load(1)
-}
-async function save() {
-  if (saving.value) return
-  profileError.value = ''
-  if (!profile.activities.length) {
-    profileError.value = '请至少选择一项活动偏好'
-    return
-  }
-  saving.value = true
-  try {
-    await auth.update({
-      userAccount: auth.user.userAccount,
-      nickname: profile.nickname.trim(),
-      avatarUrl: profile.avatarUrl.trim(),
-      travelPace: profile.travelPace,
-      favoriteActivities: JSON.stringify(profile.activities),
-    })
-    saved.value = true
-    notice.show('个人信息和偏好已保存')
-  } catch (cause) {
-    profileError.value = cause.message
-  } finally {
-    saving.value = false
-  }
 }
 async function load(next = 1) {
   if (loading.value) return
@@ -101,9 +85,7 @@ onMounted(() => load())
     <RouterLink class="btn" to="/#create">＋ 新建旅行</RouterLink>
   </div>
   <div class="profile-strip">
-    <span class="profile-monogram" aria-hidden="true">{{
-      (auth.user?.nickname || '旅').slice(0, 1)
-    }}</span>
+    <UserAvatar :src="auth.user?.avatarUrl" :name="auth.user?.nickname" />
     <div class="grow">
       <strong>按你的喜好出发</strong>
       <p class="tiny muted">
@@ -113,44 +95,12 @@ onMounted(() => load())
         }}
       </p>
     </div>
-    <button class="btn btn-line btn-sm" @click="profileOpen = true">
-      编辑个人偏好 <span>↗</span>
-    </button>
+    <button class="btn btn-line btn-sm" @click="openProfile">编辑个人偏好 <span>↗</span></button>
   </div>
-  <ModalDialog v-if="profileOpen" title="个人信息与偏好" @close="!saving && (profileOpen = false)">
+  <ModalDialog v-if="profileOpen" title="个人信息与偏好" @close="closeProfile">
     <section class="card card-pad">
       <p class="tiny muted">已有旅行保留独立偏好，可在对应旅行房间修改。</p>
-      <form class="stack" @submit.prevent="save">
-        <div>
-          <span class="label">账号</span>
-          <div class="field readonly-field">{{ auth.user?.userAccount }}</div>
-        </div>
-        <div>
-          <label class="label" for="nickname">昵称</label
-          ><input id="nickname" v-model="profile.nickname" class="field" required maxlength="50" />
-        </div>
-        <div>
-          <label class="label" for="avatar-url">头像地址（选填）</label
-          ><input
-            id="avatar-url"
-            v-model="profile.avatarUrl"
-            type="url"
-            class="field"
-            placeholder="https://…"
-          />
-        </div>
-        <PreferenceFields
-          v-model:pace="profile.travelPace"
-          v-model:activities="profile.activities"
-        />
-        <p v-if="profileError" class="err" role="alert">{{ profileError }}</p>
-        <button class="btn" :disabled="saving">
-          {{ saving ? '保存中…' : '保存个人信息与偏好' }}
-        </button>
-        <p v-if="saved" class="notice">
-          偏好已保存，新建或加入旅行时会自动带入。已有旅行的偏好保持不变。
-        </p>
-      </form>
+      <ProfileForm @busy-change="saving = $event" />
     </section>
   </ModalDialog>
   <section class="stack trips-workspace">

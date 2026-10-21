@@ -17,6 +17,11 @@ export const router = createRouter({
       meta: { title: '注册' },
     },
     {
+      path: '/welcome',
+      component: () => import('../views/WelcomeView.vue'),
+      meta: { auth: true, title: '完善个人信息与偏好' },
+    },
+    {
       path: '/my-trips',
       component: () => import('../views/MyTripsView.vue'),
       meta: { auth: true, title: '个人中心' },

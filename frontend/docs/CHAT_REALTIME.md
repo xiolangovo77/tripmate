@@ -6,6 +6,8 @@
 
 接口前缀为 `/api`，响应均为 `{code, data, message}`，`data` 是 `TripMessageVO` 数组，ID 按字符串处理。
 
+用户消息包含 `senderNickname` 和 `senderAvatarUrl`，从用户表按当前批次的发送者 ID 批量读取，不复制到 `trip_member` 或消息表。AI 消息和已删除用户的这两个字段为空。聊天中自己的头像使用当前登录资料，其他发送者使用消息返回的头像；无头像或加载失败时显示昵称首字，AI 使用独立标识。已加载的其他用户头像会在重新查询对应消息（例如重新进入页面）后更新。
+
 | 接口 | 参数 | 顺序和用途 |
 | --- | --- | --- |
 | `GET /tripMessage/page` | `tripId`、`pageSize`、可选 `lastCreateTime` + `lastId` | 原接口，按创建时间、ID降序，首次读取最近一页，之后向前加载历史 |

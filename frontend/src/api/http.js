@@ -33,6 +33,14 @@ http.interceptors.response.use(
   (error) => {
     const status = error.response?.status
     if (status === 401 && !error.config?.skipAuthRedirect) onUnauthorized()
+    if (status === 413) {
+      const body = error.response?.data
+      const hasBusinessError = typeof body?.code === 'number' && typeof body?.message === 'string'
+      throw new ApiError(
+        (hasBusinessError && body.message) || '上传文件大小超出限制，请选择更小的图片后重试',
+        hasBusinessError ? body.code : status,
+      )
+    }
     throw new ApiError(
       status === 401
         ? '登录已过期，请重新登录'

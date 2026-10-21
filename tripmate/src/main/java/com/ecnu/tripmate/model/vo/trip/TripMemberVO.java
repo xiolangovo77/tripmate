@@ -26,6 +26,9 @@ public class TripMemberVO implements Serializable {
      */
     private String nickname;
 
+    /** 当前个人头像，从 user 表读取，不保存到 trip_member 表。 */
+    private String avatarUrl;
+
     /**
      * 本次旅行的个人预算上限
      */

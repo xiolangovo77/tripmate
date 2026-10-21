@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB      # 单个文件上限
+      max-request-size: 10MB  # 整个请求上限
   application:
     name: tripmate
   # session配置
@@ -14,6 +18,8 @@ spring:
     url: ${tripmate.datasource.url}
     username: ${tripmate.datasource.username}
     password: ${tripmate.datasource.password}
+    hikari:
+      connection-init-sql: "SET SESSION time_zone = '+08:00'"
   data:
     redis:
       host: ${tripmate.data.redis.host}
@@ -38,3 +44,11 @@ knife4j:
 amap:
   mcp:
     api-key: ${amap.mcp.api-key}
+# 添加 COS 对象存储配置（需要从腾讯云获取）
+cos:
+  client:
+    host: ${cos.client.host}
+    secretId: ${cos.client.secretId}
+    secretKey: ${cos.client.secretKey}
+    region: ${cos.client.region}
+    bucket: ${cos.client.bucket}

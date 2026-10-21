@@ -22,6 +22,12 @@ public class TripMessageVO implements Serializable {
      */
     private Long senderId;
 
+    /** 发送者当前昵称；用户不存在或 AI 消息时为空。 */
+    private String senderNickname;
+
+    /** 发送者当前头像，从用户表读取，不保存到旅行成员或消息表。 */
+    private String senderAvatarUrl;
+
     /**
      * 消息角色：用户、AI
      */

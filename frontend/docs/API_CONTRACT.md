@@ -4,6 +4,8 @@
 
 当前用户查询：GET `/user/get`，无参数，返回 Session 对应的 LoginUserVO，未登录返回 40100。
 
+注册引导：注册成功后，前端用本次输入的账号密码调用登录接口，再进入 `/welcome?redirect=…` 完善个人信息与偏好。账号密码不写入浏览器存储或 URL。表单读取后端默认资料（无名、默认文字头像、适中节奏、美食/自然/拍照）；保存通过 `/user/update` 更新资料和 Session，跳过不提交资料或上传图片。两种操作均继续到安全校验后的原始 redirect，保留邀请的 tripId 和 inviteCode。自动登录失败时跳转登录页，登录后仍进入资料设置页。该页与个人中心共用 `ProfileForm`，头像继续沿用 5 MB 校验及后端限流提示。
+
 群聊增量查询：GET `/tripMessage/latest`，Query 为 `tripId`、`pageSize`（默认30，1–50）、成对传入的可选 `lastCreateTime` 和 `lastId`。按 `(createTime, id)` 严格大于游标、升序返回消息数组；无游标从最早消息开始。旧消息状态补查使用 GET `/tripMessage/byIds`，Query 为 `tripId` 和逗号分隔的 `ids`（最多50个）。两个接口仅限已加入成员，详见 [群聊增量同步](CHAT_REALTIME.md)。
 
 旅行状态更新：POST `/trip/updateStatus`，JSON `{ id, status }`，status 使用 confirmed 或 cancelled；仅发起人，返回 boolean，前端严格要求 true。

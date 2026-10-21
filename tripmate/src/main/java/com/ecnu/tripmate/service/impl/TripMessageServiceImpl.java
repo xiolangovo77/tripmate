@@ -29,6 +29,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.ecnu.tripmate.model.entity.TripMessage;
 import com.ecnu.tripmate.mapper.TripMessageMapper;
+import com.ecnu.tripmate.mapper.UserMapper;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -63,6 +64,9 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
 
     @Resource
     private TripMemberService tripMemberService;
+
+    @Resource
+    private UserMapper userMapper;
 
     @Resource
     private AiItineraryGeneratorServiceFactory aiItineraryGeneratorServiceFactory;
@@ -254,8 +258,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         Page<TripMessage> page = this.page(Page.of(1, pageSize), queryWrapper1);
         // 6、返回VO
         List<TripMessage> records = page.getRecords();
-        List<TripMessageVO> tripMessageVOList = BeanUtil.copyToList(records, TripMessageVO.class);
-        return tripMessageVOList;
+        return toMessageVOs(records);
     }
 
     @Override
@@ -275,7 +278,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         }
         // 必须从游标后的第一条开始升序读取，不能倒序截取最新一批而跳过中间消息。
         query.orderBy("createTime", true).orderBy("id", true).limit(pageSize);
-        return BeanUtil.copyToList(mapper.selectListByQuery(query), TripMessageVO.class);
+        return toMessageVOs(mapper.selectListByQuery(query));
     }
 
     @Override
@@ -287,7 +290,35 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         checkMessageAccess(tripId, loginUser);
         QueryWrapper query = QueryWrapper.create().eq("tripId", tripId).in("id", ids)
                 .orderBy("createTime", true).orderBy("id", true);
-        return BeanUtil.copyToList(mapper.selectListByQuery(query), TripMessageVO.class);
+        return toMessageVOs(mapper.selectListByQuery(query));
+    }
+
+    private List<TripMessageVO> toMessageVOs(List<TripMessage> records) {
+        List<TripMessageVO> messages = BeanUtil.copyToList(records, TripMessageVO.class);
+        List<Long> senderIds = records.stream()
+                .filter(message -> TripMessageRoleEnum.USER.getValue().equals(message.getRole()))
+                .map(TripMessage::getSenderId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (senderIds.isEmpty()) {
+            return messages;
+        }
+        // 每批消息只查询一次头像；退出旅行的发送者仍可展示个人头像。
+        Map<Long, User> senders = userMapper.selectListByQuery(QueryWrapper.create()
+                        .select("id", "nickname", "avatarUrl").in("id", senderIds))
+                .stream().collect(Collectors.toMap(User::getId, Function.identity()));
+        for (TripMessageVO message : messages) {
+            if (!TripMessageRoleEnum.USER.getValue().equals(message.getRole())) {
+                continue;
+            }
+            User sender = senders.get(message.getSenderId());
+            if (sender != null) {
+                message.setSenderNickname(sender.getNickname());
+                message.setSenderAvatarUrl(sender.getAvatarUrl());
+            }
+        }
+        return messages;
     }
 
     private void checkMessageAccess(Long tripId, User loginUser) {

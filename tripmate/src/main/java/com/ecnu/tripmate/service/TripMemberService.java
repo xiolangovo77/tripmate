@@ -16,6 +16,9 @@ import java.util.List;
  */
 public interface TripMemberService extends IService<TripMember> {
 
+    /** 内部转换成员返回对象，批量补充用户当前头像；调用方负责查询权限。 */
+    List<TripMemberVO> toMemberVOs(List<TripMember> members);
+
     /**
      * 获取旅行当前已加入的成员列表，并校验查询用户的成员权限。
      *

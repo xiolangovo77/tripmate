@@ -23,15 +23,29 @@ async function submit() {
     return
   }
   busy.value = true
+  const credentials = { userAccount: form.userAccount, userPassword: form.userPassword }
   try {
     if (register) {
-      await userApi.register(form)
-      notice.show('注册成功，请登录')
-      form.userPassword = ''
-      form.checkPassword = ''
-      await router.replace({ path: '/login', query: route.query })
+      await userApi.register({ ...credentials, checkPassword: form.checkPassword })
+      const welcomePath = router.resolve({
+        path: '/welcome',
+        query: { redirect: safeRedirect(route.query.redirect) },
+      }).fullPath
+      try {
+        await auth.login(credentials)
+      } catch {
+        // 账号已创建，登录失败时转去登录，避免再次提交注册造成“账号重复”。
+        notice.show('账号已创建，请登录后完善个人信息')
+        await router.replace({ path: '/login', query: { redirect: welcomePath } })
+        return
+      } finally {
+        form.userPassword = ''
+        form.checkPassword = ''
+      }
+      notice.show('注册成功，欢迎加入 TripMate')
+      await router.replace(welcomePath)
     } else {
-      await auth.login({ userAccount: form.userAccount, userPassword: form.userPassword })
+      await auth.login(credentials)
       form.userPassword = ''
       await router.replace(safeRedirect(route.query.redirect))
     }

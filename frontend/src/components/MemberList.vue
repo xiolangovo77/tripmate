@@ -1,11 +1,12 @@
 <script setup>
 import { money, paceNames, parseActivities, sameId } from '../utils/format.js'
+import UserAvatar from './UserAvatar.vue'
 defineProps({ members: { type: Array, default: () => [] }, userId: [String, Number] })
 </script>
 <template>
   <div class="member-list">
     <article v-for="member in members" :key="member.userId" class="member-card">
-      <div class="member-icon" aria-hidden="true">{{ member.role === 'owner' ? '🌿' : '🎒' }}</div>
+      <UserAvatar :src="member.avatarUrl" :name="member.nickname || '旅行伙伴'" :size="40" />
       <div class="grow">
         <strong
           >{{ member.nickname || '旅行伙伴'

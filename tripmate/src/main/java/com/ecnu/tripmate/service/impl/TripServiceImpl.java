@@ -190,7 +190,7 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
         if(tripMembers == null || tripMembers.isEmpty()){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "不存在旅行人员");
         }
-        List<TripMemberVO> tripMembersVO = BeanUtil.copyToList(tripMembers, TripMemberVO.class);
+        List<TripMemberVO> tripMembersVO = tripMemberService.toMemberVOs(tripMembers);
         // 4、返回数据
         TripVO tripVO = new TripVO();
         BeanUtil.copyProperties(trip, tripVO);
