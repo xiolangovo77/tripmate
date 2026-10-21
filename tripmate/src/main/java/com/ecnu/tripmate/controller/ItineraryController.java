@@ -9,6 +9,8 @@ import com.ecnu.tripmate.model.dto.Itinerary.ItineraryUpdateRequest;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryVO;
 import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
+import com.ecnu.tripmate.ratelimiter.annotation.RateLimit;
+import com.ecnu.tripmate.ratelimiter.enums.RateLimitType;
 import com.ecnu.tripmate.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +42,7 @@ public class ItineraryController {
      * @return
      */
     @PostMapping("add")
+    @RateLimit(limitType = RateLimitType.USER, rate = 10, rateInterval = 60, message = "生成行程过于频繁，请稍后再试")
     public BaseResponse<Long> add(@RequestBody ItineraryAddRequest itineraryAddRequest, HttpServletRequest request){
         if(itineraryAddRequest == null || request == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -103,6 +106,7 @@ public class ItineraryController {
      * @return
      */
     @PutMapping("update")
+    @RateLimit(limitType = RateLimitType.USER, rate = 10, rateInterval = 60, message = "更新行程过于频繁，请稍后再试")
     public BaseResponse<Long> update(@RequestBody ItineraryUpdateRequest itineraryUpdateRequest, HttpServletRequest request){
         // 获取用户登录信息
         User loginUser = userService.getLoginUser(request);
