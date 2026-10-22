@@ -68,10 +68,10 @@ watch(text, async () => {
 function sender(message) {
   if (message.role === 'assistant') return '✦ AI 旅行搭子'
   return (
-    props.members.find((member) => sameId(member.userId, message.senderId))?.nickname ||
-    message.senderNickname ||
     (sameId(message.senderId, auth.user?.id) ? auth.user?.nickname : '') ||
-    `成员 ${message.senderId}`
+    message.senderNickname ||
+    props.members.find((member) => sameId(member.userId, message.senderId))?.nickname ||
+    '未知成员'
   )
 }
 function senderAvatar(message) {

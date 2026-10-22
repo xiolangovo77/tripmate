@@ -11,7 +11,7 @@ import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.entity.ItineraryItem;
 import com.ecnu.tripmate.model.entity.Trip;
-import com.ecnu.tripmate.model.entity.TripMember;
+import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
 import com.ecnu.tripmate.model.entity.TripMessage;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.enums.ItineraryStatusEnum;
@@ -310,8 +310,9 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
                             .eq("recallStatus", TripMessageRecallStatusEnum.NORMAL.getValue()))
                     .stream().collect(Collectors.toMap(TripMessage::getId, Function.identity()));
             // 与旅行成员背景使用相同的昵称，避免逐条查询用户资料。
-            Map<Long, String> nicknames = tripMemberService.list(new QueryWrapper().eq("tripId", tripId))
-                    .stream().collect(Collectors.toMap(TripMember::getUserId,
+            Map<Long, String> nicknames = tripMemberService.toMemberVOs(
+                            tripMemberService.list(new QueryWrapper().eq("tripId", tripId)))
+                    .stream().collect(Collectors.toMap(TripMemberVO::getUserId,
                             member -> StrUtil.blankToDefault(member.getNickname(), "未知成员"),
                             (first, second) -> first));
             updatePrompt.append("用户的建议如下（每组包含原始问题和对应的AI建议）：\n");

@@ -52,8 +52,12 @@ class TripMessageMemoryTest {
         when(trips.getInitItineraryPrompt(7L)).thenReturn("旅行：杭州；成员：小王，预算2000元");
         when(itineraries.getIdByTripId(7L)).thenReturn(null);
         when(messages.selectRecentAiReplies(7L, 20)).thenReturn(List.of());
+        var memberVO = new com.ecnu.tripmate.model.vo.trip.TripMemberVO();
+        memberVO.setUserId(100L);
+        memberVO.setNickname("小王");
+        when(members.toMemberVOs(any())).thenReturn(List.of(memberVO));
         when(members.list(any(QueryWrapper.class)))
-                .thenReturn(List.of(TripMember.builder().userId(100L).nickname("小王").build()));
+                .thenReturn(List.of(TripMember.builder().userId(100L).build()));
     }
 
     @Test

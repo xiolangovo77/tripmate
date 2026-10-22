@@ -172,11 +172,14 @@ class TripScheduleTest {
         TripMemberMapper memberMapper = mock(TripMemberMapper.class);
         when(members.getMapper()).thenReturn(memberMapper);
         TripMember member = new TripMember();
-        member.setNickname("同行者");
+        member.setUserId(11L);
         member.setBudgetLimit(BigDecimal.valueOf(800));
         member.setTravelPace("balanced");
         member.setFavoriteActivities("[\"自然\"]");
         when(memberMapper.selectListByQuery(any())).thenReturn(List.of(member));
+        var memberVO = cn.hutool.core.bean.BeanUtil.copyProperties(member, com.ecnu.tripmate.model.vo.trip.TripMemberVO.class);
+        memberVO.setNickname("当前昵称");
+        when(members.toMemberVOs(List.of(member))).thenReturn(List.of(memberVO));
         when(itineraries.selectCountByQuery(any())).thenReturn(1L);
         var detail = service.getTripById(22L);
         assertEquals("上海", detail.getDepartureLocation());
@@ -184,6 +187,7 @@ class TripScheduleTest {
         assertEquals("evening", detail.getReturnPeriod());
         assertTrue(detail.isHasItinerary());
         String prompt = service.getInitItineraryPrompt(22L);
+        assertTrue(prompt.contains("名字：当前昵称"));
         assertTrue(prompt.contains("出发地：上海"));
         assertTrue(prompt.contains("出发日期：2028-02-28"));
         assertTrue(prompt.contains("返回日期（到达出发地）：2028-03-01"));

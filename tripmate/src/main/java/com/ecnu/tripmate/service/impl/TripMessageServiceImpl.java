@@ -13,7 +13,7 @@ import com.ecnu.tripmate.event.TripSuggestionsChangedEvent;
 import com.ecnu.tripmate.event.TripMessagesChangedEvent;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.entity.Trip;
-import com.ecnu.tripmate.model.entity.TripMember;
+import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.enums.trip.TripMemberRoleEnum;
 import com.ecnu.tripmate.model.enums.tripMessage.TripMessageChangeStatusEnum;
@@ -117,8 +117,9 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
             Map<Long, TripMessage> questions = mapper.selectListByQuery(questionQuery).stream()
                     .collect(Collectors.toMap(TripMessage::getId, Function.identity()));
             // 批量读取旅行成员昵称，包含已退出成员，供历史消息使用。
-            Map<Long, String> nicknames = tripMemberService.list(new QueryWrapper().eq("tripId", tripId))
-                    .stream().collect(Collectors.toMap(TripMember::getUserId,
+            Map<Long, String> nicknames = tripMemberService.toMemberVOs(
+                            tripMemberService.list(new QueryWrapper().eq("tripId", tripId)))
+                    .stream().collect(Collectors.toMap(TripMemberVO::getUserId,
                             member -> StrUtil.blankToDefault(member.getNickname(), "未知成员"),
                             (first, second) -> first));
             // 查询结果倒序，成对反向遍历，保证写入顺序为旧问题、旧回答、新问题、新回答。
@@ -128,8 +129,8 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
                 if (question == null || StrUtil.isBlank(question.getContent())) {
                     continue;
                 }
-                history.add(UserMessage.from(String.format("用户昵称：%s\n消息内容：%s",
-                        nicknames.getOrDefault(question.getSenderId(), "未知成员"), question.getContent())));
+                history.add(UserMessage.from(String.format("用户id：%s\n用户昵称：%s\n消息内容：%s",
+                        question.getSenderId(),nicknames.getOrDefault(question.getSenderId(), "未知成员"), question.getContent())));
                 // 恢复模型原本的JSON输出契约；已应用/忽略是业务状态，不是模型输出状态。
                 MessageResponseResult response = new MessageResponseResult();
                 response.setContent(reply.getContent());
@@ -381,9 +382,9 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         String itineraryInfos = itineraryService.getItineraryInfosPrompt(itineraryVO);
         prompt.append(itineraryInfos);
         // 10、获取用户发送的消息
-        String nickname = loginUser.getNickname();
+        String nickname = StrUtil.blankToDefault(loginUser.getNickname(), "未知成员");
         String userContent = tripMessage.getContent();
-        String userMessage = String.format("以下是旅行群聊中用户发送的消息，请结合用户的需求进行回复。\n用户昵称：%s\n消息内容：%s", nickname, userContent);
+        String userMessage = String.format("以下是旅行群聊中用户发送的消息，请结合用户的需求进行回复。\n用户id：%s\n用户昵称：%s\n消息内容：%s", userId, nickname, userContent);
         prompt.append(userMessage);
         // 11、调用ai
         AiItineraryGeneratorService aiItineraryGeneratorService = aiItineraryGeneratorServiceFactory.getAiItineraryGeneratorService(tripId);

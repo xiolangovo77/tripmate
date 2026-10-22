@@ -236,9 +236,10 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
             【旅行成员信息】
             """, trip.getTitle(), trip.getDepartureLocation(), trip.getDestination(), trip.getDepartureDate(),
                 trip.getDeparturePeriod(), trip.getReturnDate(), trip.getReturnPeriod(), trip.getTravelDays(), tripMemberList.size()));
-        // 5、生成旅行成员信息
+        // 5、从用户表补充当前昵称，生成旅行成员信息
+        List<TripMemberVO> memberVOs = tripMemberService.toMemberVOs(tripMemberList);
         for(int i = 0; i < tripMemberList.size(); i++){
-            TripMember tripMember = tripMemberList.get(i);
+            TripMemberVO tripMember = memberVOs.get(i);
             String nickname = tripMember.getNickname();
             BigDecimal budgetLimit = tripMember.getBudgetLimit();
             String travelPace = tripMember.getTravelPace();

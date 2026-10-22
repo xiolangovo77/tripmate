@@ -1,5 +1,6 @@
 package com.ecnu.tripmate.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONUtil;
 import cn.hutool.core.bean.BeanUtil;
@@ -77,10 +78,11 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
             return result;
         }
         Map<Long, User> users = userMapper.selectListByQuery(QueryWrapper.create()
-                        .select("id", "avatarUrl").in("id", userIds))
+                        .select("id", "nickname", "avatarUrl").in("id", userIds))
                 .stream().collect(Collectors.toMap(User::getId, Function.identity()));
         for (TripMemberVO member : result) {
             User user = users.get(member.getUserId());
+            member.setNickname(user == null ? "未知成员" : StrUtil.blankToDefault(user.getNickname(), "未知成员"));
             if (user != null) {
                 member.setAvatarUrl(user.getAvatarUrl());
             }
@@ -147,7 +149,6 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
         }
         // 5、设置默认值
         Long userId = logiguser.getId();
-        String nickname = logiguser.getNickname();
         String travelPace = logiguser.getTravelPace();
         String status = TripMemberStatusEnum.JOINED.getValue();
         String favoriteActivities = logiguser.getFavoriteActivities();
@@ -156,7 +157,6 @@ public class TripMemberServiceImpl extends ServiceImpl<TripMemberMapper, TripMem
         TripMember tripMember = TripMember.builder()
                 .tripId(tripId)
                 .userId(userId)
-                .nickname(nickname)
                 .role(role)
                 .budgetLimit(budgetLimit)
                 .travelPace(travelPace)
