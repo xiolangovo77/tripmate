@@ -240,6 +240,7 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
         List<TripMemberVO> memberVOs = tripMemberService.toMemberVOs(tripMemberList);
         for(int i = 0; i < tripMemberList.size(); i++){
             TripMemberVO tripMember = memberVOs.get(i);
+            Long userId = tripMember.getUserId();
             String nickname = tripMember.getNickname();
             BigDecimal budgetLimit = tripMember.getBudgetLimit();
             String travelPace = tripMember.getTravelPace();
@@ -248,11 +249,12 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
             initItineraryPrompt.append(String.format("""
 
                 成员%d：
+                成员id：%d
                 名字：%s
                 预算：%s
                 节奏偏好：%s
                 活动偏好：%s
-                """, i + 1, nickname, budget, travelPace, favoriteActivities));
+                """, i + 1, userId, nickname, budget, travelPace, favoriteActivities));
         }
         return initItineraryPrompt.toString();
     }

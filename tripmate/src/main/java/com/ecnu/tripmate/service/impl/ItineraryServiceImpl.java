@@ -321,7 +321,8 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
                 TripMessage question = aiMessage.getReplyToId() == null ? null : questions.get(aiMessage.getReplyToId());
                 updatePrompt.append(String.format("【建议%d】\n", i + 1));
                 if (question != null && StrUtil.isNotBlank(question.getContent())) {
-                    updatePrompt.append(String.format("用户昵称：%s\n提问时间：%s\n用户原始问题：\n%s\n",
+                    updatePrompt.append(String.format("用户id：%d\n用户昵称：%s\n提问时间：%s\n用户原始问题：\n%s\n",
+                            question.getSenderId(),
                             nicknames.getOrDefault(question.getSenderId(), "未知成员"),
                             question.getCreateTime(), question.getContent()));
                 } else {

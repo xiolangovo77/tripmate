@@ -129,7 +129,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
                 if (question == null || StrUtil.isBlank(question.getContent())) {
                     continue;
                 }
-                history.add(UserMessage.from(String.format("用户id：%s\n用户昵称：%s\n消息内容：%s",
+                history.add(UserMessage.from(String.format("用户id：%d\n用户昵称：%s\n消息内容：%s",
                         question.getSenderId(),nicknames.getOrDefault(question.getSenderId(), "未知成员"), question.getContent())));
                 // 恢复模型原本的JSON输出契约；已应用/忽略是业务状态，不是模型输出状态。
                 MessageResponseResult response = new MessageResponseResult();
@@ -384,7 +384,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         // 10、获取用户发送的消息
         String nickname = StrUtil.blankToDefault(loginUser.getNickname(), "未知成员");
         String userContent = tripMessage.getContent();
-        String userMessage = String.format("以下是旅行群聊中用户发送的消息，请结合用户的需求进行回复。\n用户id：%s\n用户昵称：%s\n消息内容：%s", userId, nickname, userContent);
+        String userMessage = String.format("以下是旅行群聊中用户发送的消息，请结合用户的需求进行回复。\n用户id：%d\n用户昵称：%s\n消息内容：%s", userId, nickname, userContent);
         prompt.append(userMessage);
         // 11、调用ai
         AiItineraryGeneratorService aiItineraryGeneratorService = aiItineraryGeneratorServiceFactory.getAiItineraryGeneratorService(tripId);
