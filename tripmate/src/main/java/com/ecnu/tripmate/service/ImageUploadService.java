@@ -8,10 +8,10 @@ import org.springframework.web.multipart.MultipartFile;
 public interface ImageUploadService {
 
     /**
-     * 校验图片并上传到对象存储。
+     * 校验、裁剪并压缩头像后上传到对象存储。
      *
      * @param file 上传的图片文件
      * @return 图片访问地址
      */
-    String upload(MultipartFile file);
+    String uploadAvatar(MultipartFile file);
 }

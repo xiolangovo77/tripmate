@@ -154,8 +154,7 @@ async function save() {
           />
         </div>
         <p :id="`${id}-avatar-help`" class="tiny muted">
-          未上传时使用昵称首字作为默认头像。每天最多修改 5 次，单张图片不超过 5 MB。 支持
-          JPG、PNG、GIF、WebP、BMP，点击下方保存后生效。
+          图片不超过 5 MB，每天最多修改 5 次，保存后生效。
         </p>
         <p v-if="avatarFile" class="tiny muted" role="status">
           已选择 {{ avatarFile.name }}，待保存。

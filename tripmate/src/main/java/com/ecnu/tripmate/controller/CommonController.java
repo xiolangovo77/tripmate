@@ -24,7 +24,7 @@ public class CommonController {
     private ImageUploadService imageUploadService;
 
     /**
-     * 上传图片到 COS。
+     * 处理并上传头像到 COS，保留现有上传路径。
      *
      * @param file 前端上传的图片文件
      * @return 图片访问地址
@@ -32,6 +32,6 @@ public class CommonController {
     @PostMapping("/upload")
     @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 86400, message = "今日头像修改次数已达上限（5次），请明天再试")
     public BaseResponse<String> upload(@RequestParam("file") MultipartFile file) {
-        return ResultUtils.success(imageUploadService.upload(file));
+        return ResultUtils.success(imageUploadService.uploadAvatar(file));
     }
 }
