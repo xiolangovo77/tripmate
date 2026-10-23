@@ -50,6 +50,42 @@ knife4j:
   setting:
     language: zh_cn
 
+# AI
+langchain4j:
+  open-ai:
+    deepseek-tripmate-chat-model:
+      base-url: ${langchain4j.open-ai.deepseek-tripmate-chat-model.base-url}
+      api-key: ${langchain4j.open-ai.deepseek-tripmate-chat-model.api-key}
+      model-name: ${langchain4j.open-ai.deepseek-tripmate-chat-model.model-name}
+      log-requests: ${langchain4j.open-ai.deepseek-tripmate-chat-model.log-requests}
+      log-responses: ${langchain4j.open-ai.deepseek-tripmate-chat-model.log-responses}
+      max-tokens: ${langchain4j.open-ai.deepseek-tripmate-chat-model.max-tokens}
+      strict-json-schema: ${langchain4j.open-ai.deepseek-tripmate-chat-model.strict-json-schema}
+      response-format: ${langchain4j.open-ai.deepseek-tripmate-chat-model.response-format}
+    deepseek-check-chat-model:
+      base-url: ${langchain4j.open-ai.deepseek-check-chat-model.base-url}
+      api-key: ${langchain4j.open-ai.deepseek-check-chat-model.api-key}
+      model-name: ${langchain4j.open-ai.deepseek-check-chat-model.model-name}
+      log-requests: ${langchain4j.open-ai.deepseek-check-chat-model.log-requests}
+      log-responses: ${langchain4j.open-ai.deepseek-check-chat-model.log-responses}
+      max-tokens: ${langchain4j.open-ai.deepseek-check-chat-model.max-tokens}
+    qwen-tripmate-chat-model:
+      base-url: ${langchain4j.open-ai.qwen-tripmate-chat-model.base-url}
+      api-key: ${langchain4j.open-ai.qwen-tripmate-chat-model.api-key}
+      model-name: ${langchain4j.open-ai.qwen-tripmate-chat-model.model-name}
+      log-requests: ${langchain4j.open-ai.qwen-tripmate-chat-model.log-requests}
+      log-responses: ${langchain4j.open-ai.qwen-tripmate-chat-model.log-responses}
+      max-tokens: ${langchain4j.open-ai.qwen-tripmate-chat-model.max-tokens}
+      strict-json-schema: ${langchain4j.open-ai.qwen-tripmate-chat-model.strict-json-schema}
+      response-format: ${langchain4j.open-ai.qwen-tripmate-chat-model.response-format}
+    qwen-check-chat-model:
+      base-url: ${langchain4j.open-ai.qwen-check-chat-model.base-url}
+      api-key: ${langchain4j.open-ai.qwen-check-chat-model.api-key}
+      model-name: ${langchain4j.open-ai.qwen-check-chat-model.model-name}
+      log-requests: ${langchain4j.open-ai.qwen-check-chat-model.log-requests}
+      log-responses: ${langchain4j.open-ai.qwen-check-chat-model.log-responses}
+      max-tokens: ${langchain4j.open-ai.qwen-check-chat-model.max-tokens}
+
 amap:
   mcp:
     api-key: ${amap.mcp.api-key}

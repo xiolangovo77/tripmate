@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 
 @Configuration
-@ConfigurationProperties(prefix = "langchain4j.open-ai.tripmate-chat-model")
+@ConfigurationProperties(prefix = "langchain4j.open-ai.deepseek-tripmate-chat-model")
 @Data
 public class TripMateChatModelConfig {
 
