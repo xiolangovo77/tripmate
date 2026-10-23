@@ -2,6 +2,7 @@ package com.ecnu.tripmate.ai;
 
 
 import com.ecnu.tripmate.service.TripMessageService;
+import com.ecnu.tripmate.util.SpringContextUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
@@ -21,7 +22,7 @@ import java.time.Duration;
 @Slf4j
 public class AiItineraryGeneratorServiceFactory {
 
-    @Resource(name = "openAiChatModel")
+    @Resource(name = "TripMateChatModelPrototype")
     private ChatModel chatModel;
 
     @Resource
@@ -72,7 +73,7 @@ public class AiItineraryGeneratorServiceFactory {
         // 加载历史记忆
         tripMessageService.loadChatMemory(tripId, chatMemory);
         return AiServices.builder(AiItineraryGeneratorService.class)
-                .chatModel(chatModel)
+                .chatModel(SpringContextUtil.getBean("TripMateChatModelPrototype", ChatModel.class))
                 .toolProvider(mcpToolProvider)
                 .chatMemory(chatMemory)
                 .build();
