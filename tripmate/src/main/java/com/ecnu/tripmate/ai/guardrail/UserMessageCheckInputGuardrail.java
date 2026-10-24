@@ -1,6 +1,7 @@
 package com.ecnu.tripmate.ai.guardrail;
 
 import cn.hutool.extra.spring.SpringUtil;
+import cn.hutool.json.JSONUtil;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.guardrail.InputGuardrail;
 import dev.langchain4j.guardrail.InputGuardrailResult;
@@ -39,6 +40,16 @@ public class UserMessageCheckInputGuardrail implements InputGuardrail {
         String content = contentIndex >= 0
                 ? prompt.substring(contentIndex + MESSAGE_CONTENT_MARKER.length())
                 : prompt;
+        if (JSONUtil.isTypeJSONObject(prompt)) {
+            try {
+                var input = JSONUtil.parseObj(prompt);
+                if (input.containsKey("currentQuestion")) {
+                    content = input.getJSONObject("currentQuestion").getStr("content", "");
+                }
+            } catch (RuntimeException exception) {
+                return rejectMessage();
+            }
+        }
         if (content.isBlank() || content.length() > MAX_MESSAGE_LENGTH) {
             return rejectMessage();
         }

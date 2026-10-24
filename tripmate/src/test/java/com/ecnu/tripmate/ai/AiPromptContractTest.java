@@ -1,5 +1,7 @@
 package com.ecnu.tripmate.ai;
 
+import cn.hutool.extra.spring.SpringUtil;
+import com.ecnu.tripmate.ai.guardrail.InputGuardrailService;
 import com.ecnu.tripmate.ai.model.ItineraryResult;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -8,6 +10,9 @@ import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.service.AiServices;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.mockito.MockedStatic;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -16,12 +21,28 @@ import java.sql.Time;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * 离线验证资源绑定和 LangChain4j 的真实结构化解析，不启动 Spring、数据库或调用大模型。
  * 固定模型响应只验证接口契约，不代表模型遵循提示词的生成质量。
  */
 class AiPromptContractTest {
+
+    private MockedStatic<SpringUtil> spring;
+
+    @BeforeEach
+    void stubCheckModel() {
+        var checker = mock(InputGuardrailService.class);
+        when(checker.userMessageCheck(anyString())).thenReturn("true");
+        spring = mockStatic(SpringUtil.class);
+        spring.when(() -> SpringUtil.getBean(InputGuardrailService.class)).thenReturn(checker);
+    }
+
+    @AfterEach
+    void closeStub() {
+        spring.close();
+    }
 
     private static final String ITINERARY_JSON = """
             {

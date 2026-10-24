@@ -5,21 +5,18 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorService;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorServiceFactory;
-import com.ecnu.tripmate.ai.model.ItineraryItemResult;
-import com.ecnu.tripmate.ai.model.ItineraryResult;
+import com.ecnu.tripmate.ai.memory.TripChatHistoryCache;
+import com.ecnu.tripmate.ai.memory.TripChatTurn;
 import com.ecnu.tripmate.ai.model.MessageResponseResult;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.event.TripSuggestionsChangedEvent;
 import com.ecnu.tripmate.event.TripMessagesChangedEvent;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.model.entity.Trip;
-import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
 import com.ecnu.tripmate.model.entity.User;
-import com.ecnu.tripmate.model.enums.trip.TripMemberRoleEnum;
 import com.ecnu.tripmate.model.enums.tripMessage.TripMessageChangeStatusEnum;
 import com.ecnu.tripmate.model.enums.tripMessage.TripMessageRecallStatusEnum;
 import com.ecnu.tripmate.model.enums.tripMessage.TripMessageRoleEnum;
-import com.ecnu.tripmate.model.vo.itinerary.ItineraryItemVO;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryVO;
 import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.model.vo.tripMessage.TripMessageVO;
@@ -30,13 +27,7 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.ecnu.tripmate.model.entity.TripMessage;
 import com.ecnu.tripmate.mapper.TripMessageMapper;
 import com.ecnu.tripmate.mapper.UserMapper;
-import dev.langchain4j.agent.tool.P;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.memory.ChatMemory;
 import jakarta.annotation.Resource;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -72,76 +63,14 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
     private AiItineraryGeneratorServiceFactory aiItineraryGeneratorServiceFactory;
 
     @Resource
+    private TripChatHistoryCache chatHistoryCache;
+
+    @Resource
     @Lazy
     private ItineraryService itineraryService;
 
     @Resource
     private ApplicationEventPublisher eventPublisher;
-
-    private static final int HISTORY_PAIR_LIMIT = 20;
-
-    @Override
-    public void loadChatMemory(Long tripId, ChatMemory chatMemory) {
-        if (tripId == null || tripId <= 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
-        }
-        if (chatMemory == null || !Objects.equals(tripId, chatMemory.id())) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "聊天记忆与旅行不匹配");
-        }
-        if (!chatMemory.messages().isEmpty()) {
-            return;
-        }
-
-        StringBuilder context = new StringBuilder("以下为初始化时的旅行背景，当前请求提供的信息优先。\n")
-                .append(tripService.getInitItineraryPrompt(tripId));
-        Long itineraryId = itineraryService.getIdByTripId(tripId);
-        if (itineraryId != null) {
-            context.append('\n').append(itineraryService.getItineraryInfosPrompt(itineraryService.get(itineraryId)));
-        } else {
-            context.append("\n【当前行程信息】\n尚未生成行程。\n");
-        }
-
-        // 以AI回复关联用户问题识别@AI问答，不依赖消息正文是否包含“@AI”。
-        List<TripMessage> replies = mapper.selectRecentAiReplies(tripId, HISTORY_PAIR_LIMIT);
-        List<ChatMessage> history = new ArrayList<>();
-        // 背景使用普通消息，避免被各AI方法的@SystemMessage替换。
-        history.add(UserMessage.from(context.toString()));
-        history.add(AiMessage.from("已收到旅行背景，将结合当前请求中的最新信息回答。"));
-        if (!replies.isEmpty()) {
-            List<Long> questionIds = replies.stream().map(TripMessage::getReplyToId).distinct().toList();
-            QueryWrapper questionQuery = new QueryWrapper()
-                    .in("id", questionIds)
-                    .eq("tripId", tripId)
-                    .eq("role", TripMessageRoleEnum.USER.getValue())
-                    .eq("recallStatus", TripMessageRecallStatusEnum.NORMAL.getValue());
-            Map<Long, TripMessage> questions = mapper.selectListByQuery(questionQuery).stream()
-                    .collect(Collectors.toMap(TripMessage::getId, Function.identity()));
-            // 批量读取旅行成员昵称，包含已退出成员，供历史消息使用。
-            Map<Long, String> nicknames = tripMemberService.toMemberVOs(
-                            tripMemberService.list(new QueryWrapper().eq("tripId", tripId)))
-                    .stream().collect(Collectors.toMap(TripMemberVO::getUserId,
-                            member -> StrUtil.blankToDefault(member.getNickname(), "未知成员"),
-                            (first, second) -> first));
-            // 查询结果倒序，成对反向遍历，保证写入顺序为旧问题、旧回答、新问题、新回答。
-            for (int i = replies.size() - 1; i >= 0; i--) {
-                TripMessage reply = replies.get(i);
-                TripMessage question = questions.get(reply.getReplyToId());
-                if (question == null || StrUtil.isBlank(question.getContent())) {
-                    continue;
-                }
-                history.add(UserMessage.from(String.format("用户id：%d\n用户昵称：%s\n消息内容：%s",
-                        question.getSenderId(),nicknames.getOrDefault(question.getSenderId(), "未知成员"), question.getContent())));
-                // 恢复模型原本的JSON输出契约；已应用/忽略是业务状态，不是模型输出状态。
-                MessageResponseResult response = new MessageResponseResult();
-                response.setContent(reply.getContent());
-                response.setChangeStatus(TripMessageChangeStatusEnum.NONE.getValue().equals(reply.getChangeStatus())
-                        ? TripMessageChangeStatusEnum.NONE.getValue() : TripMessageChangeStatusEnum.PENDING.getValue());
-                history.add(AiMessage.from(JSONUtil.toJsonStr(response)));
-            }
-        }
-        // 完成所有数据库读取后再写记忆，避免查询失败留下不完整的初始化内容。
-        chatMemory.add(history);
-    }
 
     @Override
     @Transactional
@@ -363,6 +292,10 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if(tripMessage == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户消息不存在");
         }
+        if (!Objects.equals(tripId, tripMessage.getTripId())
+                || !TripMessageRoleEnum.USER.getValue().equals(tripMessage.getRole())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "只能回复本旅行的用户消息");
+        }
         // 6、消息是否撤回
         String recallStatus = tripMessage.getRecallStatus();
         if(TripMessageRecallStatusEnum.RECALLED.getValue().equals(recallStatus)){
@@ -384,11 +317,11 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         // 10、获取用户发送的消息
         String nickname = StrUtil.blankToDefault(loginUser.getNickname(), "未知成员");
         String userContent = tripMessage.getContent();
-        String userMessage = String.format("以下是旅行群聊中用户发送的消息，请结合用户的需求进行回复。\n用户id：%d\n用户昵称：%s\n消息内容：%s", userId, nickname, userContent);
-        prompt.append(userMessage);
+        String userMessage = buildChatPrompt(prompt.toString(), chatHistoryCache.getRecent(tripId),
+                userId, nickname, userContent);
         // 11、调用ai
         AiItineraryGeneratorService aiItineraryGeneratorService = aiItineraryGeneratorServiceFactory.getAiItineraryGeneratorService(tripId);
-        MessageResponseResult messageResponseResult = aiItineraryGeneratorService.messageResponse(prompt.toString());
+        MessageResponseResult messageResponseResult = aiItineraryGeneratorService.messageResponse(userMessage);
         if(messageResponseResult == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI调用失败，请重试");
         }
@@ -398,7 +331,8 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if(StrUtil.hasBlank(content, changeStatus)){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI调用失败，请重试");
         }
-        if(TripMessageChangeStatusEnum.getEnumByValue(changeStatus) == null){
+        if (!TripMessageChangeStatusEnum.NONE.getValue().equals(changeStatus)
+                && !TripMessageChangeStatusEnum.PENDING.getValue().equals(changeStatus)) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI调用失败，请重试");
         }
         // 13、添加ai消息
@@ -416,11 +350,30 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if(!saveResult){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "保存ai消息失败，数据库错误");
         }
+        // 只保留原始问题和最终回复；背景、系统提示词、行程和工具结果均不进入 Redis。
+        chatHistoryCache.appendAfterCommit(tripId, new TripChatTurn(tripAiMessage.getId(),
+                userId, nickname, userContent, content, changeStatus));
         eventPublisher.publishEvent(new TripMessagesChangedEvent(tripId));
         if (!TripMessageChangeStatusEnum.NONE.getValue().equals(changeStatus)) {
             eventPublisher.publishEvent(new TripSuggestionsChangedEvent(tripId));
         }
         return content;
+    }
+
+    /** 分别封装最新背景、历史问答和当前问题，避免正文标签干扰输入检查。 */
+    private String buildChatPrompt(String background, List<TripChatTurn> history,
+                                   Long userId, String nickname, String content) {
+        var turns = history.stream().map(turn -> JSONUtil.createObj()
+                .set("userId", turn.getUserId()).set("nickname", turn.getNickname())
+                .set("question", turn.getQuestion())
+                .set("reply", JSONUtil.createObj().set("content", turn.getContent())
+                        .set("changeStatus", turn.getChangeStatus()))).toList();
+        return JSONUtil.createObj()
+                .set("background", background)
+                .set("history", turns)
+                .set("currentQuestion", JSONUtil.createObj().set("userId", userId)
+                        .set("nickname", nickname).set("content", content))
+                .toString();
     }
 
     @Override

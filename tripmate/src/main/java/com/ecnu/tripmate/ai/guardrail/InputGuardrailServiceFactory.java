@@ -1,22 +1,12 @@
 package com.ecnu.tripmate.ai.guardrail;
 
 
-import com.ecnu.tripmate.ai.AiItineraryGeneratorService;
-import com.ecnu.tripmate.service.TripMessageService;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
-import dev.langchain4j.mcp.McpToolProvider;
-import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
-
-import java.time.Duration;
 
 @Configuration
 @Slf4j

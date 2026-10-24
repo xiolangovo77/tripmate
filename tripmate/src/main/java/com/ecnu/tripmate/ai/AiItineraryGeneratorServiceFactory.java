@@ -1,20 +1,15 @@
 package com.ecnu.tripmate.ai;
 
-
-import com.ecnu.tripmate.service.TripMessageService;
 import com.ecnu.tripmate.util.SpringContextUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.mcp.McpToolProvider;
-import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 
 import java.time.Duration;
 
@@ -27,13 +22,6 @@ public class AiItineraryGeneratorServiceFactory {
 
     @Resource
     private McpToolProvider mcpToolProvider;
-
-    @Resource
-    private RedisChatMemoryStore redisChatMemoryStore;
-
-    @Resource
-    @Lazy
-    private TripMessageService tripMessageService;
 
     /**
      * AI 服务实例缓存
@@ -63,19 +51,10 @@ public class AiItineraryGeneratorServiceFactory {
      * @param tripId
      * @return
      */
-    private AiItineraryGeneratorService createAiItineraryGeneratorService(long tripId){
-        MessageWindowChatMemory chatMemory = MessageWindowChatMemory
-                .builder()
-                .id(tripId)
-                .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(50)
-                .build();
-        // 加载历史记忆
-        tripMessageService.loadChatMemory(tripId, chatMemory);
+    private AiItineraryGeneratorService createAiItineraryGeneratorService(long tripId) {
         return AiServices.builder(AiItineraryGeneratorService.class)
                 .chatModel(SpringContextUtil.getBean("TripMateChatModelPrototype", ChatModel.class))
                 .toolProvider(mcpToolProvider)
-                .chatMemory(chatMemory)
                 .build();
     }
 
@@ -84,8 +63,7 @@ public class AiItineraryGeneratorServiceFactory {
      * @return
      */
     @Bean
-    public AiItineraryGeneratorService getAiItineraryGeneratorService(){
-        // 无旅行上下文的通用服务，避免启动时加载固定旅行1的数据库和记忆。
+    public AiItineraryGeneratorService getAiItineraryGeneratorService() {
         return AiServices.builder(AiItineraryGeneratorService.class)
                 .chatModel(chatModel)
                 .toolProvider(mcpToolProvider)
