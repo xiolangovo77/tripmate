@@ -1,5 +1,6 @@
 package com.ecnu.tripmate.ai.memory;
 
+import com.ecnu.tripmate.cache.TripChatHistoryLoader;
 import com.ecnu.tripmate.mapper.TripMessageMapper;
 import com.ecnu.tripmate.model.entity.TripMessage;
 import com.ecnu.tripmate.model.vo.trip.TripMemberVO;

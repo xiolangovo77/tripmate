@@ -375,6 +375,7 @@ onMounted(load)
           ref="chat"
           :trip-id="tripId"
           :events="tripEvents"
+          :itinerary-busy="busy"
           :members="trip.tripMembers"
           @changed="suggestions?.load()"
         />

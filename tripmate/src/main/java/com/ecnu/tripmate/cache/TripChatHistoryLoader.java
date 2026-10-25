@@ -1,6 +1,7 @@
-package com.ecnu.tripmate.ai.memory;
+package com.ecnu.tripmate.cache;
 
 import cn.hutool.core.util.StrUtil;
+import com.ecnu.tripmate.model.dto.ai.TripChatTurn;
 import com.ecnu.tripmate.mapper.TripMessageMapper;
 import com.ecnu.tripmate.model.entity.TripMessage;
 import com.ecnu.tripmate.model.vo.trip.TripMemberVO;

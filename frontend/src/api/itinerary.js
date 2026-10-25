@@ -1,6 +1,7 @@
 import { http, requireCount } from './http.js'
 import { asId } from '../utils/json.js'
 export const itineraryApi = {
+  busy: (tripId, config) => http.get('/itinerary/busy', { ...config, params: { tripId } }),
   getByTrip: (tripId, config) =>
     http.get('/itinerary/getByTripId', { ...config, params: { tripId } }),
   idByTrip: (tripId) => http.get('/itinerary/getIdByTripId', { params: { tripId } }),

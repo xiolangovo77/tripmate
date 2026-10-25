@@ -1,6 +1,9 @@
 package com.ecnu.tripmate.ai.memory;
 
 import cn.hutool.json.JSONUtil;
+import com.ecnu.tripmate.cache.TripChatHistoryCache;
+import com.ecnu.tripmate.cache.TripChatHistoryLoader;
+import com.ecnu.tripmate.model.dto.ai.TripChatTurn;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RBucket;

@@ -66,13 +66,6 @@ public interface ItineraryService extends IService<Itinerary> {
     String getItineraryInfosPrompt(ItineraryVO itineraryVO);
 
     /**
-     * 删除行程和行程明细
-     * @param id 行程id
-     * @return
-     */
-    boolean delete(Long id);
-
-    /**
      * 根据旅行id获取行程id
      * @param tripId 旅行id
      * @return

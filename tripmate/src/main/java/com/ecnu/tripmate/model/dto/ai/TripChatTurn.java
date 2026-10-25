@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.ai.memory;
+package com.ecnu.tripmate.model.dto.ai;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

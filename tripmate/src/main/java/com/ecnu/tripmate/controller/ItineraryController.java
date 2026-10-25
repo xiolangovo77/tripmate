@@ -1,6 +1,7 @@
 package com.ecnu.tripmate.controller;
 
 import com.ecnu.tripmate.common.BaseResponse;
+import com.ecnu.tripmate.cache.ItineraryCache;
 import com.ecnu.tripmate.common.ResultUtils;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
@@ -12,6 +13,7 @@ import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.ratelimiter.annotation.RateLimit;
 import com.ecnu.tripmate.ratelimiter.enums.RateLimitType;
 import com.ecnu.tripmate.service.UserService;
+import com.ecnu.tripmate.service.TripMemberService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +36,24 @@ public class ItineraryController {
 
     @Resource
     private ItineraryService itineraryService;
+
+    @Resource
+    private ItineraryCache itineraryCache;
+
+    @Resource
+    private TripMemberService tripMemberService;
+
+    /** 已加入的成员可查询行程是否正在处理；不等待行程锁或读取完整行程。 */
+    @GetMapping("busy")
+    public ResponseEntity<BaseResponse<Boolean>> busy(@RequestParam Long tripId, HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        if (tripId == null || tripId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
+        }
+        tripMemberService.checkMemberAccess(tripId, loginUser.getId());
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(ResultUtils.success(itineraryCache.isBusy(tripId)));
+    }
 
     /**
      * 添加行程

@@ -3,7 +3,7 @@ package com.ecnu.tripmate.ai;
 import cn.hutool.extra.spring.SpringUtil;
 import com.ecnu.tripmate.ai.guardrail.InputGuardrailService;
 import cn.hutool.json.JSONUtil;
-import com.ecnu.tripmate.ai.memory.TripChatTurn;
+import com.ecnu.tripmate.model.dto.ai.TripChatTurn;
 import com.ecnu.tripmate.util.SpringContextUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;

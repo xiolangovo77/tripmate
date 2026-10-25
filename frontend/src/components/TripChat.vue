@@ -1,7 +1,9 @@
 <script setup>
-import { computed, nextTick, ref, toRef, watch, useId } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, toRef, watch, useId } from 'vue'
 import { messageApi } from '../api/message.js'
+import { itineraryApi } from '../api/itinerary.js'
 import { useTripMessages } from '../composables/useTripMessages.js'
+import { useTripSnapshot } from '../composables/useTripSnapshot.js'
 import { useAuthStore } from '../stores/auth.js'
 import UserAvatar from './UserAvatar.vue'
 import { asId } from '../utils/json.js'
@@ -10,6 +12,7 @@ const props = defineProps({
   tripId: { type: String, required: true },
   events: { type: Object, required: true },
   members: { type: Array, default: () => [] },
+  itineraryBusy: { type: Boolean, default: false },
 })
 const emit = defineEmits(['changed'])
 const auth = useAuthStore()
@@ -39,6 +42,36 @@ const stage = ref('')
 const composer = ref(null)
 const composerId = useId()
 const withAi = computed(() => mentionsAi(text.value))
+const remoteItineraryBusy = ref(false)
+const itineraryBusyHint = '行程处理中，暂时无法 @AI，请稍后再试。普通聊天仍可发送。'
+const itineraryBusy = computed(() => props.itineraryBusy || remoteItineraryBusy.value)
+const busySnapshot = useTripSnapshot({
+  tripId: toRef(props, 'tripId'),
+  events: props.events,
+  eventName: 'trip.itinerary.changed',
+  read: (id, signal) => itineraryApi.busy(id, { signal }),
+  apply: (busy) => {
+    remoteItineraryBusy.value = busy === true
+  },
+  reset: () => {
+    remoteItineraryBusy.value = false
+  },
+})
+// 查询其他成员发起的操作；隐藏页面或断线时，沿用共享事件连接的暂停机制。
+const busyTimer = setInterval(() => {
+  if (!busySnapshot.refreshing.value) busySnapshot.refresh()
+}, 3000)
+onBeforeUnmount(() => clearInterval(busyTimer))
+
+async function canAskAi() {
+  if (props.itineraryBusy) return false
+  const synced = await busySnapshot.refresh()
+  if (!synced) {
+    sendError.value = '暂时无法确认行程状态，请稍后重试；普通聊天不受影响。'
+    return false
+  }
+  return !itineraryBusy.value
+}
 const chatMessages = computed(() =>
   messages.value.map((message) => ({
     ...message,
@@ -46,10 +79,12 @@ const chatMessages = computed(() =>
   })),
 )
 function fillPrompt(prompt) {
+  if (itineraryBusy.value && mentionsAi(prompt)) return
   text.value = text.value.trim() ? `${text.value}\n${prompt}` : prompt
   nextTick(() => composer.value?.focus())
 }
 function mentionAi() {
+  if (itineraryBusy.value) return
   text.value = mentionsAi(text.value) ? text.value : '@AI ' + text.value
   composer.value?.focus()
 }
@@ -79,11 +114,20 @@ function senderAvatar(message) {
   return message.senderAvatarUrl || ''
 }
 async function askAi(id) {
+  if (aiBusy.value) return
   aiBusy.value = true
-  retryAiId.value = null
-  needsItinerary.value = false
-  stage.value = 'AI 正在整理想法，请稍候…'
   try {
+    // 保存消息后可能刚好开始更新行程，再次检查；保留原消息 ID，恢复后可重试。
+    if (!(await canAskAi())) {
+      retryAiId.value = id
+      sendError.value = itineraryBusy.value
+        ? '你的消息已保存。行程处理中，完成后可重试 AI 回复。'
+        : sendError.value
+      return
+    }
+    retryAiId.value = null
+    needsItinerary.value = false
+    stage.value = 'AI 正在整理想法，请稍候…'
     await messageApi.ai(props.tripId, id)
     emit('changed')
   } catch (cause) {
@@ -107,6 +151,8 @@ async function send() {
   needsItinerary.value = false
   retryAiId.value = null
   try {
+    // 手动输入 @AI 或使用键盘快捷发送也需要检查，拦截时保留输入内容。
+    if (mentionsAi(content) && !(await canAskAi())) return
     const id = asId(await messageApi.add(props.tripId, content))
     text.value = ''
     // 普通消息绝不调用 AI；replyToId 必须使用已保存的用户消息 ID。
@@ -121,7 +167,7 @@ async function send() {
   }
 }
 async function retryAi() {
-  if (aiBusy.value || sending.value || !retryAiId.value) return
+  if (aiBusy.value || sending.value || itineraryBusy.value || !retryAiId.value) return
   const id = retryAiId.value
   sendError.value = ''
   // 超时可能已经落库，先查询回复，避免盲目重发用户消息或 AI 请求。
@@ -233,6 +279,7 @@ defineExpose({ refresh })
       </div>
     </div>
     <div v-if="stage" class="callout" role="status"><span class="spinner" /> {{ stage }}</div>
+    <div v-if="itineraryBusy" class="callout" role="status">{{ itineraryBusyHint }}</div>
     <div v-if="needsItinerary" class="callout chat-feedback" role="status">
       <strong>先生成行程，再和 AI 聊聊吧</strong>
       <span
@@ -245,7 +292,7 @@ defineExpose({ refresh })
       <button
         v-if="retryAiId"
         class="text-btn"
-        :disabled="aiBusy || sending || loading"
+        :disabled="aiBusy || sending || loading || itineraryBusy"
         @click="retryAi"
       >
         重试 AI 回复
@@ -256,7 +303,7 @@ defineExpose({ refresh })
         v-for="prompt in ['大家有什么特别想去的地方？', '@AI 帮我们安排轻松一点的路线']"
         :key="prompt"
         type="button"
-        :disabled="sending || aiBusy"
+        :disabled="sending || aiBusy || (itineraryBusy && mentionsAi(prompt))"
         @click="fillPrompt(prompt)"
       >
         {{ prompt }} ↗
@@ -265,14 +312,18 @@ defineExpose({ refresh })
     <form class="stack chat-composer" :class="{ 'with-ai': withAi }" @submit.prevent="send">
       <div class="row between">
         <label class="label" :for="composerId">说说你的想法</label
-        ><span v-if="withAi" class="ai-indicator">✦ AI 将参与回复</span>
+        ><span v-if="withAi" class="ai-indicator">{{
+          itineraryBusy ? '✦ 行程处理中，AI 暂不可用' : '✦ AI 将参与回复'
+        }}</span>
       </div>
       <textarea
         :id="composerId"
         ref="composer"
         v-model="text"
         class="field"
-        placeholder="例如：@AI 帮我们安排轻松一点的路线"
+        :placeholder="
+          itineraryBusy ? '行程处理中，可以先和旅行成员聊聊' : '例如：@AI 帮我们安排轻松一点的路线'
+        "
         maxlength="4000"
         required
         :disabled="sending || aiBusy"
@@ -283,12 +334,16 @@ defineExpose({ refresh })
         <button
           class="btn btn-soft btn-sm"
           type="button"
-          :disabled="sending || aiBusy"
+          :disabled="sending || aiBusy || itineraryBusy"
+          :title="itineraryBusy ? itineraryBusyHint : '让 AI 参与回复'"
           @click="mentionAi"
         >
           @AI</button
         ><span :id="`${composerId}-hint`" class="composer-hint">Ctrl / ⌘ + Enter 发送</span
-        ><button class="btn btn-sm" :disabled="sending || aiBusy || !text.trim()">
+        ><button
+          class="btn btn-sm"
+          :disabled="sending || aiBusy || !text.trim() || (withAi && itineraryBusy)"
+        >
           {{ aiBusy ? '等待 AI…' : sending ? '发送中…' : '发送 ↗' }}
         </button>
       </div>

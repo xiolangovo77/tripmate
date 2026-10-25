@@ -5,8 +5,8 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorService;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorServiceFactory;
-import com.ecnu.tripmate.ai.memory.TripChatHistoryCache;
-import com.ecnu.tripmate.ai.memory.TripChatTurn;
+import com.ecnu.tripmate.cache.TripChatHistoryCache;
+import com.ecnu.tripmate.model.dto.ai.TripChatTurn;
 import com.ecnu.tripmate.ai.model.MessageResponseResult;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.event.TripSuggestionsChangedEvent;
@@ -274,8 +274,8 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         // 2、判断旅行是否存在
         tripService.isTripExists(tripId);
         // 3、判断行程是否存在
-        Long itineraryId = itineraryService.getIdByTripId(tripId);
-        if(itineraryId == null || itineraryId <=0){
+        ItineraryVO itineraryVO = itineraryService.getByTripId(tripId, loginUser);
+        if(itineraryVO == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "行程不存在");
         }
         // 4、判断该用户是否是该旅行的成员
@@ -311,7 +311,6 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         String tripAndTripMemberInfos = tripService.getInitItineraryPrompt(tripId);
         prompt.append(tripAndTripMemberInfos);
         // 9、获取行程和行程明细信息
-        ItineraryVO itineraryVO = itineraryService.get(itineraryId);
         String itineraryInfos = itineraryService.getItineraryInfosPrompt(itineraryVO);
         prompt.append(itineraryInfos);
         // 10、获取用户发送的消息

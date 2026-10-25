@@ -2,8 +2,8 @@ package com.ecnu.tripmate.service;
 
 import com.ecnu.tripmate.ai.AiItineraryGeneratorService;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorServiceFactory;
-import com.ecnu.tripmate.ai.memory.TripChatHistoryCache;
-import com.ecnu.tripmate.ai.memory.TripChatTurn;
+import com.ecnu.tripmate.cache.TripChatHistoryCache;
+import com.ecnu.tripmate.model.dto.ai.TripChatTurn;
 import com.ecnu.tripmate.ai.model.MessageResponseResult;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.mapper.TripMemberMapper;
@@ -44,9 +44,8 @@ class TripMessageAiHistoryTest {
         var memberMapper = mock(TripMemberMapper.class);
         when(members.getMapper()).thenReturn(memberMapper);
         when(memberMapper.selectCountByQuery(any(QueryWrapper.class))).thenReturn(1L);
-        when(itineraries.getIdByTripId(7L)).thenReturn(8L);
         var itinerary = new ItineraryVO();
-        when(itineraries.get(8L)).thenReturn(itinerary);
+        when(itineraries.getByTripId(7L, user)).thenReturn(itinerary);
         when(itineraries.getItineraryInfosPrompt(itinerary)).thenReturn("最新行程B\n");
         when(trips.getInitItineraryPrompt(7L)).thenReturn("最新旅行和成员背景\n");
         when(cache.getRecent(7L)).thenReturn(List.of());
