@@ -11,6 +11,8 @@ import com.ecnu.tripmate.model.dto.user.UserRegisterRequest;
 import com.ecnu.tripmate.model.dto.user.UserUpdateRequest;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.user.LoginUserVO;
+import com.ecnu.tripmate.ratelimiter.annotation.RateLimit;
+import com.ecnu.tripmate.ratelimiter.enums.RateLimitType;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +36,7 @@ public class UserController {
      * @return 用户id
      */
     @PostMapping("register")
+    @RateLimit(limitType = RateLimitType.API, rate = 30, rateInterval = 2592000, rateLimiterTtl = 720, message = "注册请求过于频繁，请稍后再试")
     public BaseResponse<Long> register(@RequestBody UserRegisterRequest userRegisterRequest){
         if(userRegisterRequest == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -52,6 +55,7 @@ public class UserController {
      * @return 脱敏后的用户信息
      */
     @PostMapping("login")
+    @RateLimit(limitType = RateLimitType.IP, rate = 100, rateInterval = 86400, rateLimiterTtl = 24, message = "登录请求过于频繁，请稍后再试")
     public BaseResponse<LoginUserVO> login(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request){
         if(userLoginRequest == null || request == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);

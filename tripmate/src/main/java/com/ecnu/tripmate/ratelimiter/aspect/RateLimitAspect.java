@@ -39,9 +39,11 @@ public class RateLimitAspect {
         String key = generateRateLimitKey(point, rateLimit);
         // 使用Redisson的分布式限流器
         RRateLimiter rateLimiter = redissonClient.getRateLimiter(key);
-        rateLimiter.expire(Duration.ofHours(1)); // 1 小时后过期
         // 设置限流器参数：每个时间窗口允许的请求数和时间窗口
         rateLimiter.trySetRate(RateType.OVERALL, rateLimit.rate(), rateLimit.rateInterval(), RateIntervalUnit.SECONDS);
+        // 设置限流器过期时间(时)
+        int rateLimiterTtl = rateLimit.rateLimiterTtl();
+        rateLimiter.expire(Duration.ofHours(rateLimiterTtl)); // rateLimiterTtl 小时后过期
         // 尝试获取令牌，如果获取失败则限流
         if (!rateLimiter.tryAcquire(1)) {
             throw new BusinessException(ErrorCode.TOO_MANY_REQUEST, rateLimit.message());

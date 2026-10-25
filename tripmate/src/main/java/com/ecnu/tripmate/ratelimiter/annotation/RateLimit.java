@@ -25,6 +25,11 @@ public @interface RateLimit {
      * 时间窗口（秒）
      */
     int rateInterval() default 1;
+
+    /**
+     * 限流器过期时间
+     */
+    int rateLimiterTtl() default 1;
     
     /**
      * 限流类型

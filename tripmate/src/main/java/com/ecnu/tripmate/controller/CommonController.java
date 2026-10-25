@@ -30,7 +30,7 @@ public class CommonController {
      * @return 图片访问地址
      */
     @PostMapping("/upload")
-    @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 86400, message = "今日头像修改次数已达上限（5次），请明天再试")
+    @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 86400, rateLimiterTtl = 24, message = "今日头像修改次数已达上限（5次），请明天再试")
     public BaseResponse<String> upload(@RequestParam("file") MultipartFile file) {
         return ResultUtils.success(imageUploadService.uploadAvatar(file));
     }
