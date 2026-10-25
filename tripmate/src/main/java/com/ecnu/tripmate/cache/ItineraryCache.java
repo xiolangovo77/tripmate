@@ -2,6 +2,7 @@ package com.ecnu.tripmate.cache;
 
 import cn.hutool.json.JSONConfig;
 import cn.hutool.json.JSONUtil;
+import com.ecnu.tripmate.event.TripItineraryUpdatingEvent;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryVO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,7 @@ import org.redisson.api.RedissonClient;
 import org.redisson.client.RedisException;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -31,12 +33,29 @@ public class ItineraryCache {
     @Resource
     private ItineraryCacheLoader loader;
 
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
+
     @Value("${spring.data.redis.ttl}")
     private long ttl;
 
-    /** 仅查询旅行锁状态，不等待锁，供聊天页面提示暂时不可调用 AI。 */
+    /** 只判断更新操作，不把生成、确认或缓存读取持有的旅行锁当成更新。 */
     public boolean isBusy(Long tripId) {
-        return lock(tripId).isLocked();
+        return redissonClient.getLock(KEY_PREFIX + tripId + ":updating").isLocked();
+    }
+
+    /** 在旅行锁内标记更新状态，覆盖整个写事务及提交回调，失败时也清除并通知。 */
+    public <T> T withUpdateStatus(Long tripId, Supplier<T> action) {
+        // 独立的 Redis 锁仅用于共享更新状态；看门狗续期，进程退出后自动过期。
+        RLock updating = redissonClient.getLock(KEY_PREFIX + tripId + ":updating");
+        updating.lock();
+        try {
+            eventPublisher.publishEvent(new TripItineraryUpdatingEvent(tripId));
+            return action.get();
+        } finally {
+            updating.unlock();
+            eventPublisher.publishEvent(new TripItineraryUpdatingEvent(tripId));
+        }
     }
 
     /** 不指定固定租期，使用 Redisson 看门狗为长时间 AI 调用续期。 */

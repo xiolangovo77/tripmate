@@ -1,6 +1,9 @@
 package com.ecnu.tripmate.sse;
 
 import com.ecnu.tripmate.event.TripItineraryChangedEvent;
+import com.ecnu.tripmate.event.TripItineraryUpdatingEvent;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -9,6 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * 旅行行程业务事件与SSE推送之间的适配层。
  */
 @Component
+@Slf4j
 public class TripItineraryEventListener {
     private final TripSseService sseService;
 
@@ -19,6 +23,17 @@ public class TripItineraryEventListener {
      */
     public TripItineraryEventListener(TripSseService sseService) {
         this.sseService = sseService;
+    }
+
+    /** 开始时立即通知，结束（包含回滚）时也通知，不能等到提交成功才发送。 */
+    @EventListener
+    public void itineraryUpdating(TripItineraryUpdatingEvent event) {
+        try {
+            sseService.broadcast(event.tripId(), "trip.itinerary.updating");
+        } catch (RuntimeException exception) {
+            // 通知失败不影响更新结果，客户端重连或再次发送时会查询状态。
+            log.warn("行程更新状态通知失败，tripId={}", event.tripId(), exception);
+        }
     }
 
     /**

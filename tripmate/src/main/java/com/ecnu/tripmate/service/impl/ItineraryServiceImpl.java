@@ -297,8 +297,13 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "行程不存在或已更新，请刷新后重试");
         }
         Long tripId = itinerary.getTripId();
-        // 3、获取旅行锁并开启新事务，串行执行本次行程更新。
-        return executeWrite(tripId, () -> updateLocked(id, tripId, messageList, loginuser));
+        // 3、取得旅行锁后标记“正在更新”，状态持续到事务及缓存刷新完成。
+        // 生成和确认仍使用 executeWrite，不设置此状态。
+        return itineraryCache.withTripLock(tripId, () -> itineraryCache.withUpdateStatus(tripId, () -> {
+            var transaction = new TransactionTemplate(transactionManager);
+            transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            return transaction.execute(status -> updateLocked(id, tripId, messageList, loginuser));
+        }));
     }
 
     /** 在旅行锁和事务内应用选中的建议，用 AI 生成的新行程整体替换旧行程。 */

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref, toRef, watch, useId } from 'vue'
+import { computed, nextTick, ref, toRef, watch, useId } from 'vue'
 import { messageApi } from '../api/message.js'
 import { itineraryApi } from '../api/itinerary.js'
 import { useTripMessages } from '../composables/useTripMessages.js'
@@ -43,12 +43,12 @@ const composer = ref(null)
 const composerId = useId()
 const withAi = computed(() => mentionsAi(text.value))
 const remoteItineraryBusy = ref(false)
-const itineraryBusyHint = '行程处理中，暂时无法 @AI，请稍后再试。普通聊天仍可发送。'
+const itineraryBusyHint = '行程更新中，暂时无法 @AI，请稍后再试。普通聊天仍可发送。'
 const itineraryBusy = computed(() => props.itineraryBusy || remoteItineraryBusy.value)
 const busySnapshot = useTripSnapshot({
   tripId: toRef(props, 'tripId'),
   events: props.events,
-  eventName: 'trip.itinerary.changed',
+  eventName: 'trip.itinerary.updating',
   read: (id, signal) => itineraryApi.busy(id, { signal }),
   apply: (busy) => {
     remoteItineraryBusy.value = busy === true
@@ -57,11 +57,7 @@ const busySnapshot = useTripSnapshot({
     remoteItineraryBusy.value = false
   },
 })
-// 查询其他成员发起的操作；隐藏页面或断线时，沿用共享事件连接的暂停机制。
-const busyTimer = setInterval(() => {
-  if (!busySnapshot.refreshing.value) busySnapshot.refresh()
-}, 3000)
-onBeforeUnmount(() => clearInterval(busyTimer))
+// 更新开始和结束通过 SSE 触发查询，复用共享连接的重连及补查机制。
 
 async function canAskAi() {
   if (props.itineraryBusy) return false
@@ -121,7 +117,7 @@ async function askAi(id) {
     if (!(await canAskAi())) {
       retryAiId.value = id
       sendError.value = itineraryBusy.value
-        ? '你的消息已保存。行程处理中，完成后可重试 AI 回复。'
+        ? '你的消息已保存。行程更新中，完成后可重试 AI 回复。'
         : sendError.value
       return
     }
@@ -313,7 +309,7 @@ defineExpose({ refresh })
       <div class="row between">
         <label class="label" :for="composerId">说说你的想法</label
         ><span v-if="withAi" class="ai-indicator">{{
-          itineraryBusy ? '✦ 行程处理中，AI 暂不可用' : '✦ AI 将参与回复'
+          itineraryBusy ? '✦ 行程更新中，AI 暂不可用' : '✦ AI 将参与回复'
         }}</span>
       </div>
       <textarea
@@ -322,7 +318,7 @@ defineExpose({ refresh })
         v-model="text"
         class="field"
         :placeholder="
-          itineraryBusy ? '行程处理中，可以先和旅行成员聊聊' : '例如：@AI 帮我们安排轻松一点的路线'
+          itineraryBusy ? '行程更新中，可以先和旅行成员聊聊' : '例如：@AI 帮我们安排轻松一点的路线'
         "
         maxlength="4000"
         required

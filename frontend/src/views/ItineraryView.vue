@@ -32,6 +32,7 @@ const {
   tripEvents,
 } = useTrip(route)
 const busy = ref(false)
+const updating = ref(false)
 const actionError = ref('')
 const tripStatusError = ref('')
 const tripStatusPending = ref(false)
@@ -147,8 +148,14 @@ async function apply(messages) {
   actionError.value = ''
   busyText.value = 'AI 正在根据所选建议更新行程…'
   try {
-    // 后端在事务内将建议标记为 applied，删除旧行程并返回新 ID；不能提前更改建议状态。
-    await itineraryApi.update(targetId, messages)
+    // 仅更新请求期间禁用 @AI，生成、确认及后续页面刷新不使用此状态。
+    updating.value = true
+    try {
+      // 后端在事务内将建议标记为 applied，删除旧行程并返回新 ID；不能提前更改建议状态。
+      await itineraryApi.update(targetId, messages)
+    } finally {
+      updating.value = false
+    }
     notice.show('行程已更新，请查看新的草案')
     await loadPlan()
     await suggestions.value?.load()
@@ -375,7 +382,7 @@ onMounted(load)
           ref="chat"
           :trip-id="tripId"
           :events="tripEvents"
-          :itinerary-busy="busy"
+          :itinerary-busy="updating"
           :members="trip.tripMembers"
           @changed="suggestions?.load()"
         />

@@ -95,6 +95,7 @@ class ItineraryCacheServiceTest {
             try { return ((Supplier<?>) i.getArgument(1)).get(); }
             finally { events.add("unlock"); locked = false; }
         });
+        when(cache.withUpdateStatus(eq(7L), any())).thenAnswer(i -> ((Supplier<?>) i.getArgument(1)).get());
         when(cache.get(7L)).thenAnswer(i -> transactionalLoader.loadLatest(7L));
         doAnswer(i -> {
             assertTrue(locked);

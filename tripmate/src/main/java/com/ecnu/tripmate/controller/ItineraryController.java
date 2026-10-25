@@ -43,7 +43,7 @@ public class ItineraryController {
     @Resource
     private TripMemberService tripMemberService;
 
-    /** 已加入的成员可查询行程是否正在处理；不等待行程锁或读取完整行程。 */
+    /** 已加入的成员可查询行程是否正在更新；生成、确认和普通读取均不算忙碌。 */
     @GetMapping("busy")
     public ResponseEntity<BaseResponse<Boolean>> busy(@RequestParam Long tripId, HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
