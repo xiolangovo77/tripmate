@@ -13,7 +13,6 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.redisson.api.RRateLimiter;
-import org.redisson.api.RateIntervalUnit;
 import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Component;
@@ -36,14 +35,17 @@ public class RateLimitAspect {
 
     @Before("@annotation(rateLimit)")
     public void doBefore(JoinPoint point, RateLimit rateLimit) {
+        if (rateLimit.rate() <= 0 || rateLimit.rateInterval() <= 0 || rateLimit.rateLimiterTtl() <= 0) {
+            throw new IllegalArgumentException("限流次数、时间窗口和过期时间必须大于0");
+        }
         String key = generateRateLimitKey(point, rateLimit);
-        // 使用Redisson的分布式限流器
         RRateLimiter rateLimiter = redissonClient.getRateLimiter(key);
-        // 设置限流器参数：每个时间窗口允许的请求数和时间窗口
-        rateLimiter.trySetRate(RateType.OVERALL, rateLimit.rate(), rateLimit.rateInterval(), RateIntervalUnit.SECONDS);
-        // 设置限流器过期时间(时)
-        int rateLimiterTtl = rateLimit.rateLimiterTtl();
-        rateLimiter.expire(Duration.ofHours(rateLimiterTtl)); // rateLimiterTtl 小时后过期
+        Duration interval = Duration.ofSeconds(rateLimit.rateInterval());
+        // 空闲过期时间不得短于统计窗口，否则额度会提前重置。
+        Duration keepAlive = Duration.ofSeconds(Math.max(
+                Duration.ofHours(rateLimit.rateLimiterTtl()).toSeconds(), rateLimit.rateInterval()));
+        // Redisson 在获取令牌的 Lua 脚本中统一续期配置和计数，避免单独 expire 的竞争。
+        rateLimiter.trySetRate(RateType.OVERALL, rateLimit.rate(), interval, keepAlive);
         // 尝试获取令牌，如果获取失败则限流
         if (!rateLimiter.tryAcquire(1)) {
             throw new BusinessException(ErrorCode.TOO_MANY_REQUEST, rateLimit.message());
@@ -57,31 +59,24 @@ public class RateLimitAspect {
         if (!rateLimit.key().isEmpty()) {
             keyBuilder.append(rateLimit.key()).append(":");
         }
-        // 根据限流类型生成不同的key
+        // 所有限流类型都必须隔离接口（包括同名类和重载方法）。
+        MethodSignature signature = (MethodSignature) point.getSignature();
+        Method method = signature.getMethod();
+        keyBuilder.append(method.toGenericString()).append(":");
         switch (rateLimit.limitType()) {
             case API:
-                // 接口级别：方法名
-                MethodSignature signature = (MethodSignature) point.getSignature();
-                Method method = signature.getMethod();
-                keyBuilder.append("api:").append(method.getDeclaringClass().getSimpleName())
-                        .append(".").append(method.getName());
+                keyBuilder.append("api");
                 break;
             case USER:
-                // 用户级别：用户ID
-                try {
-                    ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-                    if (attributes != null) {
-                        HttpServletRequest request = attributes.getRequest();
-                        User loginUser = userService.getLoginUser(request);
-                        keyBuilder.append("user:").append(loginUser.getId());
-                    } else {
-                        // 无法获取请求上下文，使用IP限流
-                        keyBuilder.append("ip:").append(getClientIP());
-                    }
-                } catch (BusinessException e) {
-                    // 未登录用户使用IP限流
-                    keyBuilder.append("ip:").append(getClientIP());
+                ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attributes == null) {
+                    throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
                 }
+                User loginUser = userService.getLoginUser(attributes.getRequest());
+                if (loginUser == null || loginUser.getId() == null) {
+                    throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+                }
+                keyBuilder.append("user:").append(loginUser.getId());
                 break;
             case IP:
                 // IP级别：客户端IP

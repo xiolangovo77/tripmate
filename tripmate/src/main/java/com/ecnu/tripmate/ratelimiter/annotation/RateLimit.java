@@ -12,22 +12,22 @@ import java.lang.annotation.Target;
 public @interface RateLimit {
     
     /**
-     * 限流key前缀
+     * 限流key附加前缀；不同接口始终分别统计
      */
     String key() default "";
     
     /**
-     * 每个时间窗口允许的请求数
+     * 每个时间窗口允许进入方法的请求数（方法执行失败也计数）
      */
     int rate() default 10;
     
     /**
-     * 时间窗口（秒）
+     * 滚动时间窗口（秒），2592000 表示连续30天，不是自然月
      */
     int rateInterval() default 1;
 
     /**
-     * 限流器过期时间
+     * 限流器空闲过期时间（小时），实际保留时间不短于时间窗口
      */
     int rateLimiterTtl() default 1;
     

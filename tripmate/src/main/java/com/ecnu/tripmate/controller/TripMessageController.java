@@ -12,6 +12,8 @@ import com.ecnu.tripmate.model.entity.TripMessage;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.tripMessage.TripMessageAiVO;
 import com.ecnu.tripmate.model.vo.tripMessage.TripMessageVO;
+import com.ecnu.tripmate.ratelimiter.annotation.RateLimit;
+import com.ecnu.tripmate.ratelimiter.enums.RateLimitType;
 import com.ecnu.tripmate.service.TripMessageService;
 import com.ecnu.tripmate.service.UserService;
 import jakarta.annotation.Resource;
@@ -117,6 +119,7 @@ public class TripMessageController {
      * @return
      */
     @PostMapping("addAi")
+    @RateLimit(limitType = RateLimitType.USER, rate = 20, rateInterval = 2592000, rateLimiterTtl = 720, message = "30天内询问AI次数已达上限（20次），请稍后再试")
     public BaseResponse<String> addAi(@RequestBody TripMessageAddAiRequest tripMessageAddAiRequest, HttpServletRequest request){
         if(tripMessageAddAiRequest == null || request == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);

@@ -62,7 +62,7 @@ public class ItineraryController {
      * @return
      */
     @PostMapping("add")
-    @RateLimit(limitType = RateLimitType.USER, rate = 10, rateInterval = 60, message = "生成行程过于频繁，请稍后再试")
+    @RateLimit(limitType = RateLimitType.USER, rate = 1, rateInterval = 2592000, rateLimiterTtl = 720, message = "30天内添加行程次数已达上限（1次），请稍后再试")
     public BaseResponse<Long> add(@RequestBody ItineraryAddRequest itineraryAddRequest, HttpServletRequest request){
         if(itineraryAddRequest == null || request == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -126,7 +126,7 @@ public class ItineraryController {
      * @return
      */
     @PutMapping("update")
-    @RateLimit(limitType = RateLimitType.USER, rate = 10, rateInterval = 60, message = "更新行程过于频繁，请稍后再试")
+    @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 2592000, rateLimiterTtl = 720, message = "30天内更新行程次数已达上限（5次），请稍后再试")
     public BaseResponse<Long> update(@RequestBody ItineraryUpdateRequest itineraryUpdateRequest, HttpServletRequest request){
         // 获取用户登录信息
         User loginUser = userService.getLoginUser(request);
