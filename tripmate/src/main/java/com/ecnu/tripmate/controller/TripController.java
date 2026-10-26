@@ -12,6 +12,8 @@ import com.ecnu.tripmate.model.dto.user.UserRegisterRequest;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.trip.TripPageVO;
 import com.ecnu.tripmate.model.vo.trip.TripVO;
+import com.ecnu.tripmate.ratelimiter.annotation.RateLimit;
+import com.ecnu.tripmate.ratelimiter.enums.RateLimitType;
 import com.ecnu.tripmate.service.UserService;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
@@ -47,6 +49,7 @@ public class TripController {
      * @return 旅行id
      */
     @PostMapping("add")
+    @RateLimit(limitType = RateLimitType.USER, rate = 10, rateInterval = 2592000, rateLimiterTtl = 720, message = "30天内添加旅行次数已达上限（10次），请稍后再试")
     public BaseResponse<Long> add(@RequestBody TripAddRequest tripAddRequest, HttpServletRequest request){
         if(tripAddRequest == null || request == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -85,6 +88,7 @@ public class TripController {
      * @return
      */
     @PostMapping("update")
+    @RateLimit(limitType = RateLimitType.USER, rate = 30, rateInterval = 2592000, rateLimiterTtl = 720, message = "30天内更新旅行次数已达上限（30次），请稍后再试")
     public BaseResponse<Boolean> update(@RequestBody TripUpdateRequest tripUpdateRequest, HttpServletRequest request){
         if(tripUpdateRequest == null || request == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
