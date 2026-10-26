@@ -58,18 +58,20 @@ public interface TripService extends IService<Trip> {
     void checkTripOwner(Trip trip, User loginUser);
 
     /**
-     * 获取旅行和人员信息
+     * 获取旅行和人员信息，仅允许当前已加入的成员。
      * @param tripId 旅行id
+     * @param loginUser 当前登录用户
      * @return
      */
-    TripVO getTripById(long tripId);
+    TripVO getTripById(long tripId, User loginUser);
 
     /**
-     * 获取行程初始化的提示词
+     * 获取行程初始化的提示词，包含成员隐私，调用方必须传入当前登录用户。
      * @param tripId 旅行id
+     * @param loginUser 当前登录用户
      * @return
      */
-    String getInitItineraryPrompt(Long tripId);
+    String getInitItineraryPrompt(Long tripId, User loginUser);
 
     /**
      * 分页获取旅行信息

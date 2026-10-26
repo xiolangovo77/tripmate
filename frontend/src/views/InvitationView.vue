@@ -3,11 +3,11 @@ import { scheduleLabel, routeLabel } from '../utils/tripSchedule.js'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { invitationApi } from '../api/invitation.js'
-import { memberApi, tripApi } from '../api/trip.js'
+import { memberApi } from '../api/trip.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useNoticeStore } from '../stores/notice.js'
 import { asId } from '../utils/json.js'
-import { paceNames, parseActivities, sameId } from '../utils/format.js'
+import { paceNames, parseActivities } from '../utils/format.js'
 import postcard from '../assets/postcard.svg'
 const route = useRoute()
 const router = useRouter()
@@ -20,12 +20,7 @@ const loading = ref(false)
 const joining = ref(false)
 const error = ref('')
 const budget = ref('')
-const alreadyJoined = computed(() =>
-  trip.value?.tripMembers?.some((member) => sameId(member.userId, auth.user?.id)),
-)
-const owner = computed(() =>
-  trip.value?.tripMembers?.find((member) => sameId(member.userId, trip.value.ownerId)),
-)
+const alreadyJoined = computed(() => !!auth.user && trip.value?.joined === true)
 const returnTo = computed(() => '/invitation?' + new URLSearchParams(checked.value || form))
 function invalidatePreview() {
   checked.value = null
@@ -45,8 +40,7 @@ async function check() {
     }
     if (!/^[A-HJ-NP-Z2-9]{8}$/.test(input.inviteCode))
       throw new Error('请输入 8 位大写字母和数字组成的邀请码（不含 0、1、I、O）')
-    await invitationApi.check(input.tripId, input.inviteCode)
-    trip.value = await tripApi.get(input.tripId)
+    trip.value = await invitationApi.preview(input.tripId, input.inviteCode)
     checked.value = input
   } catch (cause) {
     error.value = cause.message
@@ -60,9 +54,9 @@ async function join() {
   error.value = ''
   try {
     // 点击加入时重新验证，避免使用页面打开时已经过期或被撤销的验证结果。
-    await invitationApi.check(checked.value.tripId, checked.value.inviteCode)
-    const latest = await tripApi.get(checked.value.tripId)
-    if (!latest.tripMembers.some((member) => sameId(member.userId, auth.user.id))) {
+    const latest = await invitationApi.preview(checked.value.tripId, checked.value.inviteCode)
+    trip.value = latest
+    if (!latest.joined) {
       await memberApi.join({
         tripId: checked.value.tripId,
         inviteCode: checked.value.inviteCode,
@@ -158,10 +152,10 @@ watch(
             ><strong>{{ scheduleLabel(trip) }} · {{ trip.travelDays }} 天</strong>
           </div>
           <div>
-            <span>发起人</span><strong>{{ owner?.nickname || '旅行发起人' }}</strong>
+            <span>发起人</span><strong>{{ trip.ownerNickname || '旅行发起人' }}</strong>
           </div>
         </div>
-        <div class="callout">✓ 邀请验证通过 · {{ trip.tripMembers.length }} 位伙伴已加入</div>
+        <div class="callout">✓ 邀请验证通过 · {{ trip.memberCount }} 位伙伴已加入</div>
         <template v-if="alreadyJoined"
           ><p>你已经在旅行小队里啦。</p>
           <RouterLink class="btn btn-wide" :to="`/trips/${checked.tripId}`"

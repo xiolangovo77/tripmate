@@ -2,6 +2,9 @@
 import { test, expect } from '@playwright/test'
 
 async function fixture(page, hasItinerary = false) {
+  await page.addInitScript(() => {
+    window.EventSource = undefined
+  })
   const requests = []
   const trip = {
     ownerId: '101',
@@ -38,13 +41,20 @@ async function fixture(page, hasItinerary = false) {
           favoriteActivities: '["自然"]',
         }
       else if (path === '/trip/get') data = trip
+      else if (path === '/trip/202/members') data = trip.tripMembers
+      else if (path === '/itinerary/busy') data = false
       else if (path === '/trip/add' || path === '/trip/update') {
         const body = route.request().postDataJSON()
         requests.push(body)
         Object.assign(trip, body)
         data = path === '/trip/add' ? '202' : true
       } else if (
-        ['/tripMessage/page', '/tripMessage/getAiByChangeStatus', '/trip/page'].includes(path)
+        [
+          '/tripMessage/page',
+          '/tripMessage/latest',
+          '/tripMessage/getAiByChangeStatus',
+          '/trip/page',
+        ].includes(path)
       )
         data = []
       else throw new Error(`Unexpected request ${path}`)

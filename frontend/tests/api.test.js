@@ -116,3 +116,22 @@ test('仅明确的无数据响应转换为空状态，权限和网络错误必�
   await assert.rejects(invitationApi.check('123', 'ABCD2345'), { code: 'RESULT' })
   await assert.rejects(tripApi.updateStatus('123', 'cancelled'), { code: 'RESULT' })
 })
+
+test('邀请预览每次携带邀请码，不能以旅行详情接口替代；拒绝时保留错误', async () => {
+  const calls = []
+  let response = { code: 0, data: { title: '杭州同行', memberCount: 2, joined: false } }
+  http.defaults.adapter = async (config) => {
+    calls.push(config)
+    return { data: JSON.stringify(response), status: 200, headers: {}, config }
+  }
+  assert.equal((await invitationApi.preview('123', 'ABCD2345')).joined, false)
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].url, '/tripInvitation/preview')
+  assert.equal(calls[0].method, 'post')
+  assert.deepEqual(JSON.parse(calls[0].data), { tripId: '123', inviteCode: 'ABCD2345' })
+  response = { code: 40000, message: '邀请码已撤销' }
+  await assert.rejects(invitationApi.preview('123', 'ABCD2345'), {
+    code: 40000,
+    message: '邀请码已撤销',
+  })
+})

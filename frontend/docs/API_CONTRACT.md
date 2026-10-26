@@ -27,6 +27,7 @@
 | 创建邀请    | POST `/tripInvitation/add`                  | JSON：tripId、inviteCode；返回邀请记录 ID；旧 active 邀请被撤销                                                                                      |
 | 当前邀请    | GET `/tripInvitation/getById`               | Query：tripId；返回 inviteCode、expiresTime，无 status                                                                                               |
 | 验证邀请    | POST `/tripInvitation/check`                | JSON：tripId、inviteCode；返回 boolean；无需登录                                                                                                     |
+| 邀请预览    | POST `/tripInvitation/preview`              | JSON：tripId、inviteCode；每次校验有效邀请码；允许匿名；仅返回路线日期、标题、天数、发起人昵称、memberCount 和当前会话 joined |
 | 撤销邀请    | POST `/tripInvitation/updateStatus`         | JSON：tripId、inviteCode、status=revoked                                                                                                             |
 | 加入旅行    | POST `/tripMember/add`                      | JSON：tripId、inviteCode、budgetLimit；后端固定 member 角色                                                                                          |
 | 历史消息    | GET `/tripMessage/page`                     | Query：tripId、pageSize=30；翻页时成对传入 lastCreateTime、lastId，首页均不传；返回数组                                                               |
@@ -38,7 +39,7 @@
 | 生成行程    | POST `/itinerary/add`                       | JSON：tripId、initItineraryPrompt；仅发起人；返回行程 ID                                                                                             |
 | 查找行程 ID | GET `/itinerary/getIdByTripId`              | Query：tripId；不存在行程时返回 null                                                                                                                 |
 | 行程详情（旧接口） | GET `/itinerary/get`                  | Query：id；返回 ItineraryVO 和 itineraryItemVOList                                                                                                  |
-| 当前行程快照 | GET `/itinerary/getByTripId`               | Query：tripId；登录且已加入成员可查；返回包含 id、tripId、itineraryItemVOList 的 ItineraryVO，无行程返回 null；Cache-Control: no-store                    |
+| 当前行程快照 | GET `/itinerary/getByTripId`               | Query：tripId；登录且已加入成员可查；返回包含 id、tripId、itineraryItemVOList 的 ItineraryVO，无行程返回 null                    |
 | 采纳并修改  | PUT `/itinerary/update`                     | JSON：id、messageList（AI 消息原文）；返回新行程 ID                                                                                                  |
 | 确认行程    | PUT `/itinerary/confirmed`                  | **Query：id**，无 JSON 请求体；返回更新条数                                                                                                          |
 
@@ -77,7 +78,9 @@
 
 `tripMember/add` 已接收 inviteCode，调用 checkInviteCode 检查旅行筹备状态、邀请码归属、到期时间及撤销状态；公开接口固定使用 member，内部创建旅行仍添加 owner。前端正式加入请求只提交 tripId、inviteCode、budgetLimit，不接收或发送角色。预校验继续保留，用于展示邀请是否有效；最终校验由加入接口执行。并发撤销与加入之间的数据库锁定/一致性不属于本次前端改动。
 
-`TripInvitationServiceImpl.get` 接收 loginUser 但没有发起人/成员授权检查；当前前端仅向发起人提供管理入口。`trip/get`、`itinerary/get`、`getIdByTripId`、`trip/getPrompt` 无服务端会话/成员校验；前端路由和界面限制不能保护直接调用这些接口的数据访问，后端应补齐。
+`trip/get`、`trip/getPrompt`、`itinerary/get`、`itinerary/getIdByTripId`、`itinerary/getByTripId`、`tripMessage/get` 统一要求登录且当前仍是旅行成员（status=joined）。未登录返回 40100，非成员及退出成员返回 40101。聊天历史分页也复用有效成员校验，AI 建议仍要求发起人且未退出。
+
+`tripInvitation/getById` 只允许发起人读取邀请码。邀请页不再串联 `check` 与受保护的 `trip/get`，改为调用 `preview`，只向持有效邀请码者展示有限摘要，不返回成员 ID、预算、偏好、聊天或行程。登录后的 `joined` 只表示当前 Session 用户是否已加入。点击加入时再次获取预览，最终加入接口仍重新校验邀请码。前后端需同步发布，无数据库结构变更。
 
 消息的成员校验只检查成员记录存在，未过滤 `status=joined`。前端读取详情后只允许当前已加入成员进入房间，但已退出成员的直接 API 请求仍需后端限制。
 

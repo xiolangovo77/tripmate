@@ -125,7 +125,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
         }
         // 5、使用该旅行对应的 AI Service，根据最新旅行及成员信息生成行程。
         AiItineraryGeneratorService aiItineraryGeneratorService = aiItineraryGeneratorServiceFactory.getAiItineraryGeneratorService(tripId);
-        ItineraryResult itineraryResult = aiItineraryGeneratorService.generatorItinerary(tripService.getInitItineraryPrompt(tripId));
+        ItineraryResult itineraryResult = aiItineraryGeneratorService.generatorItinerary(tripService.getInitItineraryPrompt(tripId, loginUser));
         if(itineraryResult == null){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "调用AI失败，请重试");
         }
@@ -250,7 +250,10 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
     }
 
     @Override
-    public ItineraryVO get(Long id) {
+    public ItineraryVO get(Long id, User loginUser) {
+        if (loginUser == null || loginUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
         // 1、校验行程 ID。
         if (id == null || id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "行程id不合法");
@@ -262,7 +265,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
         }
         Long tripId = itinerary.getTripId();
         // 3、读取行程及明细；缓存未命中时由 Loader 查询数据库并回填。
-        ItineraryVO snapshot = itineraryCache.get(tripId);
+        ItineraryVO snapshot = getByTripId(tripId, loginUser);
         // 4、校验返回的快照版本，避免旧 ID 请求拿到另一份新行程。
         if (snapshot == null || !Objects.equals(id, snapshot.getId())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "行程已更新，请刷新后重试");
@@ -328,7 +331,7 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有发起人才能确认行程");
         }
         // 4、读取选中建议及其对应的用户原始问题，校验并标记建议为已应用
-        StringBuilder updatePrompt = new StringBuilder(tripService.getInitItineraryPrompt(tripId)).append("\n");
+        StringBuilder updatePrompt = new StringBuilder(tripService.getInitItineraryPrompt(tripId, loginuser)).append("\n");
         if(messageList != null && !messageList.isEmpty()){
             if (messageList.stream().anyMatch(message -> message == null
                     || message.getId() == null || message.getId() <= 0)) {
@@ -495,15 +498,9 @@ public class ItineraryServiceImpl extends ServiceImpl<ItineraryMapper, Itinerary
     }
 
     @Override
-    public Long getIdByTripId(Long tripId) {
-        // 1、参数校验
-        if(tripId == null || tripId <= 0){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不存在");
-        }
-        // 2、判断旅行是否存在
-        tripService.isTripExists(tripId);
-        // 3、读取当前完整行程并返回 ID，尚未生成行程时返回 null。
-        ItineraryVO snapshot = itineraryCache.get(tripId);
+    public Long getIdByTripId(Long tripId, User loginUser) {
+        // 复用带成员权限检查的读取入口，不能通过旧接口绕过权限访问缓存。
+        ItineraryVO snapshot = getByTripId(tripId, loginUser);
         return snapshot == null ? null : snapshot.getId();
     }
 }

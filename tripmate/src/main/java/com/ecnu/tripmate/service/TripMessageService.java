@@ -29,9 +29,10 @@ public interface TripMessageService extends IService<TripMessage> {
     /**
      * 根据id获取消息内容
      * @param id 消息id
+     * @param loginUser 当前登录用户，必须是消息所属旅行的有效成员
      * @return
      */
-    String get(Long id);
+    String get(Long id, User loginUser);
 
     /**
      * 获取消息记录

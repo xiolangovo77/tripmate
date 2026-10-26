@@ -108,6 +108,44 @@ try {
     )
     assert.equal(await anon('/tripInvitation/check', { body: { tripId, inviteCode } }), true)
   })
+  await step('有效邀请只公开摘要，匿名和未加入账号无法读取私人旅行信息', async () => {
+    const preview = await anon('/tripInvitation/preview', { body: { tripId, inviteCode } })
+    assert.equal(preview.memberCount, 1)
+    assert.equal(preview.joined, false)
+    for (const field of [
+      'tripMembers',
+      'ownerId',
+      'budgetLimit',
+      'favoriteActivities',
+      'itineraryItemVOList',
+    ])
+      assert.ok(!Object.hasOwn(preview, field))
+    for (const path of [
+      '/trip/get',
+      '/trip/getPrompt',
+      '/itinerary/getIdByTripId',
+      '/itinerary/getByTripId',
+    ]) {
+      assert.equal(
+        (await anon(path, { method: 'GET', query: { tripId }, allowError: true })).code,
+        40100,
+      )
+      assert.equal(
+        (await guest(path, { method: 'GET', query: { tripId }, allowError: true })).code,
+        40101,
+      )
+    }
+    assert.equal(
+      (
+        await guest('/tripInvitation/getById', {
+          method: 'GET',
+          query: { tripId },
+          allowError: true,
+        })
+      ).code,
+      40101,
+    )
+  })
   await step('加入接口拒绝缺少或错误的邀请码', async () => {
     for (const extra of [{}, { inviteCode: 'INVALID' }]) {
       const response = await guest('/tripMember/add', {
@@ -127,6 +165,10 @@ try {
     )
     const trip = await guest('/trip/get', { method: 'GET', query: { tripId } })
     assert.equal(trip.tripMembers.length, 2)
+    assert.equal(
+      (await guest('/tripInvitation/preview', { body: { tripId, inviteCode } })).joined,
+      true,
+    )
   })
   await step('个人信息与本次旅行偏好更新', async () => {
     assert.equal(
@@ -217,6 +259,8 @@ try {
       query: { tripId, pageSize: 30 },
     })
     assert.ok(messages.some((m) => m.id === id))
+    assert.equal((await anon('/tripMessage/get', { query: { id }, allowError: true })).code, 40100)
+    assert.equal(await owner('/tripMessage/get', { query: { id } }), '普通群聊测试：周末一起出发。')
     assert.equal(messages.filter((m) => m.role === 'assistant').length, 0)
   })
   await step('获取尚不存在的行程 ID 返回 null', async () =>
@@ -345,6 +389,17 @@ try {
     const room = await guest('/trip/get', { method: 'GET', query: { tripId } })
     assert.ok(!room.tripMembers.some((member) => member.userId === users[0].id))
     assert.ok(room.tripMembers.some((member) => member.userId === users[1].id))
+    for (const path of [
+      '/trip/get',
+      '/trip/getPrompt',
+      '/itinerary/getByTripId',
+      '/tripMessage/page',
+    ]) {
+      assert.equal(
+        (await owner(path, { method: 'GET', query: { tripId }, allowError: true })).code,
+        40101,
+      )
+    }
   })
   await step('退出登录后原 Session 无法查询旅行', async () => {
     assert.equal(await guest('/user/logout'), true)

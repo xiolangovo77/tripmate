@@ -13,7 +13,6 @@ import com.ecnu.tripmate.model.enums.trip.TripMemberRoleEnum;
 import com.ecnu.tripmate.model.enums.trip.TripMemberStatusEnum;
 import com.ecnu.tripmate.service.UserService;
 import com.ecnu.tripmate.model.vo.trip.TripMemberVO;
-import org.springframework.http.ResponseEntity;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,13 +50,12 @@ public class TripMemberController {
      *
      * @param tripId 旅行ID
      * @param request 当前HTTP请求，用于获取登录用户
-     * @return 禁止缓存的成员列表响应
+     * @return 成员列表响应
      */
     @GetMapping("/trip/{tripId}/members")
-    public ResponseEntity<BaseResponse<List<TripMemberVO>>> members(@PathVariable long tripId, HttpServletRequest request) {
+    public BaseResponse<List<TripMemberVO>> members(@PathVariable long tripId, HttpServletRequest request) {
         User user = userService.getLoginUser(request);
-        return ResponseEntity.ok().header("Cache-Control", "no-store")
-                .body(ResultUtils.success(tripMemberService.getActiveMembers(tripId, user.getId())));
+        return ResultUtils.success(tripMemberService.getActiveMembers(tripId, user.getId()));
     }
 
     /**

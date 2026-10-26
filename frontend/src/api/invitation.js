@@ -1,6 +1,7 @@
 import { http, requireTrue } from './http.js'
 import { asId } from '../utils/json.js'
 export const invitationApi = {
+  preview: (tripId, inviteCode) => http.post('/tripInvitation/preview', { tripId, inviteCode }),
   async get(tripId) {
     try {
       return await http.get('/tripInvitation/getById', { params: { tripId } })

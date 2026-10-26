@@ -48,6 +48,8 @@ export function useTrip(route) {
       loadedTripId.value = id
     } catch (cause) {
       if (requestRevision !== revision || id !== tripId.value) return
+      trip.value = null
+      loadedTripId.value = null
       error.value = cause.message
     } finally {
       if (requestRevision === revision && id === tripId.value) loading.value = false

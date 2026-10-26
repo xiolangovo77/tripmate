@@ -5,6 +5,9 @@ async function fixture(
   page,
   { owner = true, generateFails = false, statusFails = 0, leaveFails = 0 } = {},
 ) {
+  await page.addInitScript(() => {
+    window.EventSource = undefined
+  })
   const calls = []
   let plan = null
   let statusAttempts = 0
@@ -44,6 +47,9 @@ async function fixture(
           tripMembers: members,
         }
       else if (path === '/trip/getPrompt') data = '测试旅行提示词'
+      else if (path === '/trip/202/members') data = members
+      else if (path === '/itinerary/getByTripId') data = plan
+      else if (path === '/itinerary/busy') data = false
       else if (path === '/itinerary/getIdByTripId') data = plan ? '303' : null
       else if (path === '/itinerary/get') data = plan
       else if (path === '/itinerary/add') {
@@ -51,6 +57,8 @@ async function fixture(
         if (generateFails) failure = '生成失败'
         else {
           plan = {
+            id: '303',
+            tripId: '202',
             title: '新生成的行程',
             summary: '已保存的行程',
             status: 'draft',
@@ -68,7 +76,12 @@ async function fixture(
         if (++leaveAttempts <= leaveFails) failure = '成员退出失败'
         else data = true
       } else if (
-        ['/trip/page', '/tripMessage/page', '/tripMessage/getAiByChangeStatus'].includes(path)
+        [
+          '/trip/page',
+          '/tripMessage/page',
+          '/tripMessage/latest',
+          '/tripMessage/getAiByChangeStatus',
+        ].includes(path)
       )
         data = []
       else throw new Error(`意外请求：${path}`)

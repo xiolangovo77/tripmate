@@ -8,6 +8,10 @@ import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.enums.TripInvitationStatusEnum;
 import com.ecnu.tripmate.model.enums.trip.TripStatusEnum;
 import com.ecnu.tripmate.model.vo.tripInvitation.TripInvitationVO;
+import com.ecnu.tripmate.model.vo.tripInvitation.TripInvitationPreviewVO;
+import com.ecnu.tripmate.mapper.TripMemberMapper;
+import com.ecnu.tripmate.mapper.UserMapper;
+import com.ecnu.tripmate.model.enums.trip.TripMemberStatusEnum;
 import com.ecnu.tripmate.service.TripService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -33,6 +37,32 @@ public class TripInvitationServiceImpl extends ServiceImpl<TripInvitationMapper,
     @Resource
     @Lazy
     private TripService tripService;
+
+    @Resource
+    private TripMemberMapper tripMemberMapper;
+
+    @Resource
+    private UserMapper userMapper;
+
+    @Override
+    public TripInvitationPreviewVO preview(long tripId, String inviteCode, User loginUser) {
+        // 每次预览都重新校验邀请码；不接受前端传入“已验证”标记。
+        checkInviteCode(tripId, inviteCode);
+        Trip trip = tripService.isTripExists(tripId);
+        TripInvitationPreviewVO preview = new TripInvitationPreviewVO();
+        BeanUtil.copyProperties(trip, preview);
+        User owner = userMapper.selectOneByQuery(QueryWrapper.create()
+                .select("nickname").eq("id", trip.getOwnerId()));
+        preview.setOwnerNickname(owner == null ? "旅行发起人" : owner.getNickname());
+        preview.setMemberCount(tripMemberMapper.selectCountByQuery(QueryWrapper.create()
+                .eq("tripId", tripId).eq("status", TripMemberStatusEnum.JOINED.getValue())));
+        if (loginUser != null && loginUser.getId() != null) {
+            preview.setJoined(tripMemberMapper.selectCountByQuery(QueryWrapper.create()
+                    .eq("tripId", tripId).eq("status", TripMemberStatusEnum.JOINED.getValue())
+                    .eq("userId", loginUser.getId())) > 0);
+        }
+        return preview;
+    }
 
     // 邀请码固定为 8 位大写字母和数字，生成时排除容易混淆的 0、1、I、O。
     private static final Pattern INVITE_CODE_PATTERN = Pattern.compile("[A-HJ-NP-Z2-9]{8}");
@@ -126,12 +156,17 @@ public class TripInvitationServiceImpl extends ServiceImpl<TripInvitationMapper,
 
     @Override
     public TripInvitationVO get(long tripId, User loginuser) {
+        if (loginuser == null || loginuser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
         // 1、参数校验
         if(tripId <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "tripId不合法");
         }
         // 2、检验旅行是否存在
         Trip trip = tripService.isTripExists(tripId);
+        // 邀请码管理只允许发起人访问，防止外部用户获取邀请码后自行加入。
+        tripService.checkTripOwner(trip, loginuser);
         // 3、获取改旅行的有效邀请码
         QueryWrapper queryWrapper = new QueryWrapper();
         queryWrapper.eq("tripId", tripId)
@@ -172,7 +207,7 @@ public class TripInvitationServiceImpl extends ServiceImpl<TripInvitationMapper,
         // 5、邀请码是否过期
         LocalDateTime expiresTime = tripInvitation.getExpiresTime();
         LocalDateTime now = LocalDateTime.now();
-        if(expiresTime.isBefore(now)){
+        if(expiresTime != null && !expiresTime.isAfter(now)){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "邀请码已过期");
         }
         // 6、邀请码是否已撤销

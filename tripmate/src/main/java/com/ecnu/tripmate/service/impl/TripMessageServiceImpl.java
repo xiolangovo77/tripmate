@@ -126,9 +126,12 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
     }
 
     @Override
-    public String get(Long id) {
+    public String get(Long id, User loginUser) {
+        if (loginUser == null || loginUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
         // 1、参数校验
-        if(id <= 0){
+        if(id == null || id <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "id不合法");
         }
         // 2、数据库查询
@@ -136,6 +139,8 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if(tripMessage == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "消息不存在");
         }
+        // 先校验消息所属旅行的有效成员身份，撤回状态也不能向外部用户泄露。
+        checkMessageAccess(tripMessage.getTripId(), loginUser);
         // 3、判断消息是否撤回
         String recallStatus = tripMessage.getRecallStatus();
         // 如果撤回
@@ -160,17 +165,8 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         if (lastId != null && lastId <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "消息id游标不合法");
         }
-        // 2、判断旅行是否存在
-        tripService.isTripExists(tripId);
-        // 3、判断该用户是否是该旅行的成员
-        Long userId = loginUser.getId();
-        QueryWrapper queryWrapper = new QueryWrapper();
-        queryWrapper.eq("tripId", tripId)
-                .eq("userId", loginUser.getId());
-        long count = tripMemberService.getMapper().selectCountByQuery(queryWrapper);
-        if(count <= 0){
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "只有该旅行的成员才能查询消息");
-        }
+        // 与单条消息、增量消息使用同一权限规则，已退出成员也不能读历史消息。
+        checkMessageAccess(tripId, loginUser);
         // 4、封装分页sql请求
         QueryWrapper queryWrapper1 = new QueryWrapper();
         queryWrapper1.eq("tripId", tripId);
@@ -308,7 +304,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
         }
         // 8、获取旅行和旅行成员信息
         StringBuilder prompt = new StringBuilder();
-        String tripAndTripMemberInfos = tripService.getInitItineraryPrompt(tripId);
+        String tripAndTripMemberInfos = tripService.getInitItineraryPrompt(tripId, loginUser);
         prompt.append(tripAndTripMemberInfos);
         // 9、获取行程和行程明细信息
         String itineraryInfos = itineraryService.getItineraryInfosPrompt(itineraryVO);
@@ -377,6 +373,7 @@ public class TripMessageServiceImpl extends ServiceImpl<TripMessageMapper, TripM
 
     @Override
     public List<TripMessageAiVO> getAiByChangeStatus(Long tripId, String changeStatus, User loginUser) {
+        checkMessageAccess(tripId, loginUser);
         // 1、参数校验
         if(tripId <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");

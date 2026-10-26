@@ -175,7 +175,8 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
     }
 
     @Override
-    public TripVO getTripById(long tripId) {
+    public TripVO getTripById(long tripId, User loginUser) {
+        checkReadAccess(tripId, loginUser);
         // 1、校验参数
         if(tripId <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不存在");
@@ -200,7 +201,8 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
     }
 
     @Override
-    public String getInitItineraryPrompt(Long tripId) {
+    public String getInitItineraryPrompt(Long tripId, User loginUser) {
+        checkReadAccess(tripId, loginUser);
         // 1、校验参数
         if(tripId == null || tripId <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不存在");
@@ -257,6 +259,17 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip>  implements T
                 """, i + 1, userId, nickname, budget, travelPace, favoriteActivities));
         }
         return initItineraryPrompt.toString();
+    }
+
+    /** 详情和 AI 背景包含成员预算、偏好，只允许当前已加入的成员读取。 */
+    private void checkReadAccess(Long tripId, User loginUser) {
+        if (loginUser == null || loginUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        if (tripId == null || tripId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
+        }
+        tripMemberService.checkMemberAccess(tripId, loginUser.getId());
     }
 
     @Override

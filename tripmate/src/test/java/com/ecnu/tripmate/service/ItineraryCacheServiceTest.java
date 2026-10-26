@@ -79,7 +79,7 @@ class ItineraryCacheServiceTest {
         }).when(service).save(any(Itinerary.class));
         when(mapper.update(any(Itinerary.class))).thenReturn(1);
         when(trips.isTripExists(7L)).thenReturn(Trip.builder().id(7L).ownerId(100L).travelDays(1).title("旅行").build());
-        when(trips.getInitItineraryPrompt(7L)).thenReturn("最新旅行成员");
+        when(trips.getInitItineraryPrompt(7L, user)).thenReturn("最新旅行成员");
         when(factory.getAiItineraryGeneratorService(7L)).thenReturn(ai);
         var result = new ItineraryResult();
         var item = new ItineraryItemResult();

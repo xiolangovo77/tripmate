@@ -66,8 +66,9 @@ public class TripMessageController {
      * @return
      */
     @PostMapping("get")
-    public BaseResponse<String> get(@RequestParam Long id){
-        String content = tripMessageService.get(id);
+    public BaseResponse<String> get(@RequestParam Long id, HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        String content = tripMessageService.get(id, loginUser);
         return ResultUtils.success(content);
     }
 

@@ -106,8 +106,9 @@ public class TripController {
      * @return
      */
     @GetMapping("get")
-    public BaseResponse<TripVO> update(@RequestParam long tripId){
-        TripVO result = tripService.getTripById(tripId);
+    public BaseResponse<TripVO> get(@RequestParam long tripId, HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        TripVO result = tripService.getTripById(tripId, loginUser);
         return ResultUtils.success(result);
     }
 
@@ -117,8 +118,9 @@ public class TripController {
      * @return
      */
     @GetMapping("getPrompt")
-    public BaseResponse<String> getPrompt(@RequestParam long tripId){
-        String initItineraryPrompt = tripService.getInitItineraryPrompt(tripId);
+    public BaseResponse<String> getPrompt(@RequestParam long tripId, HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        String initItineraryPrompt = tripService.getInitItineraryPrompt(tripId, loginUser);
         return ResultUtils.success(initItineraryPrompt);
     }
 

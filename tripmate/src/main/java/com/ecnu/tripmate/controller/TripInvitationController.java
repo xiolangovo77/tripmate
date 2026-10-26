@@ -10,10 +10,13 @@ import com.ecnu.tripmate.model.dto.tripInvitation.TripInvitationCheckRequest;
 import com.ecnu.tripmate.model.dto.tripInvitation.TripInvitationUpdateStatusRequest;
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.tripInvitation.TripInvitationVO;
+import com.ecnu.tripmate.model.vo.tripInvitation.TripInvitationPreviewVO;
+import com.ecnu.tripmate.constant.UserConstant;
 import com.ecnu.tripmate.service.UserService;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.ecnu.tripmate.model.entity.TripInvitation;
@@ -37,6 +40,21 @@ public class TripInvitationController {
 
     @Resource
     private UserService userService;
+
+    /** 邀请预览允许匿名访问，但必须携带有效邀请码，且仅返回有限摘要。 */
+    @PostMapping("preview")
+    public BaseResponse<TripInvitationPreviewVO> preview(
+            @RequestBody TripInvitationCheckRequest previewRequest, HttpServletRequest request) {
+        if (previewRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 复用已有 Session 登录态；匿名预览不创建会话，也不触发登录跳转。
+        HttpSession session = request.getSession(false);
+        User loginUser = session == null ? null : (User) session.getAttribute(UserConstant.USER_LOGIN_STATE);
+        TripInvitationPreviewVO preview = tripInvitationService.preview(
+                previewRequest.getTripId(), previewRequest.getInviteCode(), loginUser);
+        return ResultUtils.success(preview);
+    }
 
     /**
      * 初始化邀请码

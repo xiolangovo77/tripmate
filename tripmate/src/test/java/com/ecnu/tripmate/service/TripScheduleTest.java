@@ -39,6 +39,8 @@ class TripScheduleTest {
         members = mock(TripMemberService.class);
         ReflectionTestUtils.setField(service, "itineraryMapper", itineraries);
         ReflectionTestUtils.setField(service, "tripMemberService", members);
+        ReflectionTestUtils.setField(service, "tripCityValidator",
+                mock(com.ecnu.tripmate.ai.guardrail.TripCityValidator.class));
         owner = new User();
         owner.setId(11L);
     }
@@ -181,12 +183,12 @@ class TripScheduleTest {
         memberVO.setNickname("当前昵称");
         when(members.toMemberVOs(List.of(member))).thenReturn(List.of(memberVO));
         when(itineraries.selectCountByQuery(any())).thenReturn(1L);
-        var detail = service.getTripById(22L);
+        var detail = service.getTripById(22L, owner);
         assertEquals("上海", detail.getDepartureLocation());
         assertEquals(LocalDate.of(2028, 2, 28), detail.getDepartureDate());
         assertEquals("evening", detail.getReturnPeriod());
         assertTrue(detail.isHasItinerary());
-        String prompt = service.getInitItineraryPrompt(22L);
+        String prompt = service.getInitItineraryPrompt(22L, owner);
         assertTrue(prompt.contains("名字：当前昵称"));
         assertTrue(prompt.contains("出发地：上海"));
         assertTrue(prompt.contains("出发日期：2028-02-28"));

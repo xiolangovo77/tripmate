@@ -16,7 +16,6 @@ import com.ecnu.tripmate.service.UserService;
 import com.ecnu.tripmate.service.TripMemberService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.ecnu.tripmate.service.ItineraryService;
 
@@ -45,14 +44,13 @@ public class ItineraryController {
 
     /** 已加入的成员可查询行程是否正在更新；生成、确认和普通读取均不算忙碌。 */
     @GetMapping("busy")
-    public ResponseEntity<BaseResponse<Boolean>> busy(@RequestParam Long tripId, HttpServletRequest request) {
+    public BaseResponse<Boolean> busy(@RequestParam Long tripId, HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
         if (tripId == null || tripId <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "旅行id不合法");
         }
         tripMemberService.checkMemberAccess(tripId, loginUser.getId());
-        return ResponseEntity.ok().header("Cache-Control", "no-store")
-                .body(ResultUtils.success(itineraryCache.isBusy(tripId)));
+        return ResultUtils.success(itineraryCache.isBusy(tripId));
     }
 
     /**
@@ -97,10 +95,10 @@ public class ItineraryController {
      * @return
      */
     @GetMapping("get")
-    public BaseResponse<ItineraryVO> get(@RequestParam Long id){
-        // 获取传入参数
-        ItineraryVO ItineraryVO = itineraryService.get(id);
-        return ResultUtils.success(ItineraryVO);
+    public BaseResponse<ItineraryVO> get(@RequestParam Long id, HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        ItineraryVO itineraryVO = itineraryService.get(id, loginUser);
+        return ResultUtils.success(itineraryVO);
     }
 
     /**
@@ -108,15 +106,14 @@ public class ItineraryController {
      *
      * @param tripId 旅行ID
      * @param request 当前HTTP请求，用于获取登录用户
-     * @return 禁止缓存的完整行程响应；尚未生成行程时data为null
+     * @return 完整行程响应；尚未生成行程时data为null
      */
     @GetMapping("getByTripId")
-    public ResponseEntity<BaseResponse<ItineraryVO>> getByTripId(
+    public BaseResponse<ItineraryVO> getByTripId(
             @RequestParam Long tripId, HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
         ItineraryVO itinerary = itineraryService.getByTripId(tripId, loginUser);
-        return ResponseEntity.ok().header("Cache-Control", "no-store")
-                .body(ResultUtils.success(itinerary));
+        return ResultUtils.success(itinerary);
     }
 
     /**
@@ -143,9 +140,9 @@ public class ItineraryController {
      * @return
      */
     @GetMapping("getIdByTripId")
-    public BaseResponse<Long> getIdByTripId(@RequestParam Long tripId){
-        // 获取传入参数
-        Long id = itineraryService.getIdByTripId(tripId);
+    public BaseResponse<Long> getIdByTripId(@RequestParam Long tripId, HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        Long id = itineraryService.getIdByTripId(tripId, loginUser);
         return ResultUtils.success(id);
     }
 }

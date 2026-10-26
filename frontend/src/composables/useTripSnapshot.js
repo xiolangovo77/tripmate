@@ -32,6 +32,8 @@ export function useTripSnapshot({
   function refresh({ force = false } = {}) {
     dirty = true
     if (!events.active.value || (paused.value && !force)) return Promise.resolve(false)
+    // 路由离开时同步 watcher 可能先于连接停用执行，不能用缺失的旅行 ID 发起补查。
+    if (!/^[1-9][0-9]*$/.test(String(tripId.value ?? ''))) return Promise.resolve(false)
     if (pending) return pending
     const requestEpoch = epoch
     const id = tripId.value

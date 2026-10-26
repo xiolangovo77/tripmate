@@ -36,9 +36,10 @@ public interface ItineraryService extends IService<Itinerary> {
     /**
      * 获取行程和行程明细
      * @param id 行程id
+     * @param loginUser 当前登录用户，必须是行程所属旅行的有效成员
      * @return
      */
-    ItineraryVO get(Long id);
+    ItineraryVO get(Long id, User loginUser);
 
     /**
      * 根据旅行ID读取当前行程及全部明细，并校验查询用户的成员权限。
@@ -68,7 +69,8 @@ public interface ItineraryService extends IService<Itinerary> {
     /**
      * 根据旅行id获取行程id
      * @param tripId 旅行id
+     * @param loginUser 当前登录用户，必须是有效成员
      * @return
      */
-    Long getIdByTripId(Long tripId);
+    Long getIdByTripId(Long tripId, User loginUser);
 }

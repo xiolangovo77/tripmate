@@ -47,7 +47,7 @@ class TripMessageAiHistoryTest {
         var itinerary = new ItineraryVO();
         when(itineraries.getByTripId(7L, user)).thenReturn(itinerary);
         when(itineraries.getItineraryInfosPrompt(itinerary)).thenReturn("最新行程B\n");
-        when(trips.getInitItineraryPrompt(7L)).thenReturn("最新旅行和成员背景\n");
+        when(trips.getInitItineraryPrompt(7L, user)).thenReturn("最新旅行和成员背景\n");
         when(cache.getRecent(7L)).thenReturn(List.of());
         when(factory.getAiItineraryGeneratorService(7L)).thenReturn(ai);
         response = new MessageResponseResult();

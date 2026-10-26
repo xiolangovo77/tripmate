@@ -2,6 +2,7 @@ package com.ecnu.tripmate.service;
 
 import com.ecnu.tripmate.model.entity.User;
 import com.ecnu.tripmate.model.vo.tripInvitation.TripInvitationVO;
+import com.ecnu.tripmate.model.vo.tripInvitation.TripInvitationPreviewVO;
 import com.mybatisflex.core.service.IService;
 import com.ecnu.tripmate.model.entity.TripInvitation;
 
@@ -11,6 +12,9 @@ import com.ecnu.tripmate.model.entity.TripInvitation;
  * @author Wolfcub
  */
 public interface TripInvitationService extends IService<TripInvitation> {
+
+    /** 验证邀请码后读取有限预览，loginUser 可为空（匿名访问）。 */
+    TripInvitationPreviewVO preview(long tripId, String inviteCode, User loginUser);
 
     /**
      * 初始化邀请码
