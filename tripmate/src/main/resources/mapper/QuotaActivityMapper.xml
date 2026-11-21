@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecnu.tripmate.mapper.QuotaActivityMapper">
+
+    <resultMap id="activityConfig" type="com.ecnu.tripmate.quota.model.ActivityConfig">
+        <constructor>
+            <idArg column="id" javaType="_long"/>
+            <arg column="name" javaType="String"/>
+            <arg column="ruleText" javaType="String"/>
+            <arg column="startTime" javaType="java.time.LocalDateTime"/>
+            <arg column="endTime" javaType="java.time.LocalDateTime"/>
+            <arg column="totalStock" javaType="_long"/>
+            <arg column="grantAmount" javaType="_long"/>
+            <arg column="status" javaType="String"/>
+            <arg column="configVersion" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="selectConfigById">
+        SELECT id, name, ruleText, startTime, endTime, totalStock, grantAmount, status, configVersion
+        FROM quota_activity
+        WHERE id = #{id}
+    </sql>
+
+    <select id="select" resultMap="activityConfig">
+        <include refid="selectConfigById"/>
+    </select>
+
+    <select id="lock" resultMap="activityConfig">
+        <include refid="selectConfigById"/>
+        FOR UPDATE
+    </select>
+
+    <insert id="create" parameterType="com.ecnu.tripmate.quota.model.CreateActivityRequest"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO quota_activity (name, ruleText, startTime, endTime, totalStock, grantAmount)
+        VALUES (#{name}, #{ruleText}, #{startTime}, #{endTime}, #{totalStock}, #{grantAmount})
+    </insert>
+
+    <update id="publish">
+        UPDATE quota_activity
+        SET status = 'published', configVersion = configVersion + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateDisplay">
+        UPDATE quota_activity
+        SET name = #{name}, ruleText = #{ruleText}, configVersion = configVersion + 1
+        WHERE id = #{id}
+    </update>
+
+    <select id="claims" resultType="com.ecnu.tripmate.quota.model.ActivityClaim">
+        SELECT userId, claimNo
+        FROM quota_claim
+        WHERE activityId = #{id}
+    </select>
+</mapper>

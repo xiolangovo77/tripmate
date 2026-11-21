@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     `nickname` VARCHAR(64) NOT NULL COMMENT '昵称',
     `avatarUrl` VARCHAR(1024) DEFAULT NULL COMMENT '头像地址',
     `userRole` VARCHAR(256) DEFAULT 'user' NOT NULL COMMENT '用户角色：user/admin',
+    `memberExpireAt` DATETIME DEFAULT NULL COMMENT '会员权益到期时间，NULL表示无会员权益',
     `travelPace` ENUM('relaxed', 'balanced', 'packed') NOT NULL DEFAULT 'balanced' COMMENT '旅行节奏：悠闲、适中、充实',
     `favoriteActivities` JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT '活动偏好数组：美食、自然、拍照、文化、购物',
     `isDelete` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除，1-已删除',
@@ -140,3 +141,72 @@ CREATE TABLE IF NOT EXISTS `trip_message` (
     KEY `idx_trip_message_trip_created` (`tripId`, `createTime`, `id`),
     KEY `idx_trip_message_change_status` (`tripId`, `changeStatus`, `createTime`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='旅行消息表';
+
+-- 8. 额度活动配置：总库存按份计，发放额度按 AI 使用次数计。实时余量由 Redis 维护。
+-- 发布后固定时间窗口、总份数和每份额度。应用每次更新配置时在同一事务递增 configVersion。
+CREATE TABLE IF NOT EXISTS `quota_activity` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '活动ID',
+    `name` VARCHAR(120) NOT NULL COMMENT '活动名称',
+    `ruleText` TEXT NOT NULL COMMENT '活动展示规则',
+    `startTime` DATETIME NOT NULL COMMENT '可领取起始时间（含）',
+    `endTime` DATETIME NOT NULL COMMENT '可领取截止时间（不含）',
+    `totalStock` INT UNSIGNED NOT NULL COMMENT '活动总份数',
+    `grantAmount` INT UNSIGNED NOT NULL COMMENT '每份发放的AI使用次数',
+    `status` ENUM('draft', 'published') NOT NULL DEFAULT 'draft' COMMENT '发布状态，活动进行阶段由时间窗口判断',
+    `configVersion` BIGINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '活动配置版本',
+    `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updateTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    CONSTRAINT `chk_quota_activity_window` CHECK (`endTime` > `startTime`),
+    CONSTRAINT `chk_quota_activity_stock` CHECK (`totalStock` > 0),
+    CONSTRAINT `chk_quota_activity_amount` CHECK (`grantAmount` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会员额度活动';
+
+-- 9. 领取单：同一会员每期最多一份，保存预扣时的额度快照。
+CREATE TABLE IF NOT EXISTS `quota_claim` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '领取记录ID',
+    `claimNo` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '领取单号',
+    `activityId` BIGINT UNSIGNED NOT NULL COMMENT '活动ID',
+    `userId` BIGINT UNSIGNED NOT NULL COMMENT '领取会员ID',
+    `grantAmount` INT UNSIGNED NOT NULL COMMENT '本单应发AI使用次数',
+    `status` ENUM('pending', 'granted') NOT NULL DEFAULT 'pending' COMMENT '待到账、已到账',
+    `grantedTime` DATETIME DEFAULT NULL COMMENT '实际到账时间',
+    `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_quota_claim_no` (`claimNo`),
+    UNIQUE KEY `uk_quota_claim_activity_user` (`activityId`, `userId`),
+    CONSTRAINT `chk_quota_claim_amount` CHECK (`grantAmount` > 0),
+    CONSTRAINT `chk_quota_claim_granted` CHECK (
+        (`status` = 'pending' AND `grantedTime` IS NULL) OR
+        (`status` = 'granted' AND `grantedTime` IS NOT NULL)
+    )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会员额度领取单';
+
+-- 10. 额度账户：每个用户一个账户，可在首次到账时创建。
+CREATE TABLE IF NOT EXISTS `quota_account` (
+    `userId` BIGINT UNSIGNED NOT NULL COMMENT '账户所属用户ID',
+    `balance` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '可用AI使用次数',
+    `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updateTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`userId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会员额度账户';
+
+-- 11. 额度流水：每笔余额变动与流水同事务提交。退回时按原扣减核对用户和次数。
+CREATE TABLE IF NOT EXISTS `quota_flow` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '流水ID',
+    `claimNo` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL COMMENT '发放对应的领取单号',
+    `flowType` ENUM('grant', 'debit', 'refund') NOT NULL DEFAULT 'grant' COMMENT '活动发放、使用扣减、失败退回',
+    `requestNo` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL COMMENT '全局唯一的使用请求号，扣减与退回共用',
+    `userId` BIGINT UNSIGNED NOT NULL COMMENT '额度账户用户ID',
+    `amount` BIGINT NOT NULL COMMENT '本笔AI次数变动，增加为正、扣减为负',
+    `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '入账记录时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_quota_flow_claim` (`claimNo`),
+    UNIQUE KEY `uk_quota_flow_request_type` (`requestNo`, `flowType`),
+    KEY `idx_quota_flow_user_created` (`userId`, `createTime`),
+    CONSTRAINT `chk_quota_flow_entry` CHECK (
+        (`flowType` = 'grant' AND `amount` > 0 AND `claimNo` IS NOT NULL AND `requestNo` IS NULL)
+        OR (`flowType` IN ('debit', 'refund') AND `requestNo` IS NOT NULL AND `claimNo` IS NULL
+            AND ((`flowType` = 'debit' AND `amount` < 0) OR (`flowType` = 'refund' AND `amount` > 0)))
+    )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会员额度变动流水';

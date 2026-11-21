@@ -1,0 +1,31 @@
+{
+  "activityId": 2,
+  "concurrency": 10,
+  "samples": [
+    {
+      "localEnabled": false,
+      "batch": 0,
+      "configGET": 10,
+      "stockGET": 10
+    },
+    {
+      "localEnabled": false,
+      "batch": 1,
+      "configGET": 10,
+      "stockGET": 10
+    },
+    {
+      "localEnabled": true,
+      "batch": 0,
+      "configGET": 1,
+      "stockGET": 10
+    },
+    {
+      "localEnabled": true,
+      "batch": 1,
+      "configGET": 0,
+      "stockGET": 10
+    }
+  ],
+  "cleaned": true
+}

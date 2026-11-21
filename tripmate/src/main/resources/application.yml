@@ -1,3 +1,7 @@
+quota:
+  cache:
+    local-enabled: true
+    maximum-size: 1024
 avatar:
   image:
     max-input-bytes: 5242880

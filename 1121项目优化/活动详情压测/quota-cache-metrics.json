@@ -1,0 +1,38 @@
+{
+  "startedAt": "2026-11-21T15:38:40.997Z",
+  "activityId": 3,
+  "concurrency": 100,
+  "warmupSeconds": 10,
+  "measureSeconds": 65,
+  "rounds": [
+    {
+      "mode": "Redis",
+      "successes": 390688,
+      "failures": 0,
+      "elapsedSeconds": 65.0077241,
+      "configGET": 390688,
+      "stockGET": 390688,
+      "hits": 0,
+      "misses": 0,
+      "hitRate": null,
+      "getsPerRequest": 2,
+      "configGetsPerRequest": 1
+    },
+    {
+      "mode": "Caffeine+Redis",
+      "successes": 290874,
+      "failures": 0,
+      "elapsedSeconds": 65.0089758,
+      "configGET": 2,
+      "stockGET": 290874,
+      "hits": 290872,
+      "misses": 2,
+      "hitRate": 0.999993124170603,
+      "getsPerRequest": 1.000006875829397,
+      "configGetsPerRequest": 0.000006875829396921003
+    }
+  ],
+  "getReduction": 0.4999965620853015,
+  "configGetReduction": 0.999993124170603,
+  "cleaned": true
+}
