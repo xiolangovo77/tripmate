@@ -5,6 +5,7 @@ target/
 !**/src/test/**/target/
 
 application-dev.yml
+application-prod.yml
 
 ### STS ###
 .apt_generated
