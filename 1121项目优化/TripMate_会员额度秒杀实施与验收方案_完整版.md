@@ -170,46 +170,27 @@ rabbitmq:
 2. **投递任务读取消息**后，Redis 将条目登记在消费组的待确认列表（PEL）中。若投递实例退出，其他实例可在条目空闲满 30 秒后接管，按原单号重新投递。
 3. **RabbitMQ 确认且消息成功路由**后，Lua 执行 `XACK`、`XDEL` 和 `HDEL`，清除该条目的待确认状态、消息正文和 `pending` 中对应用户的索引。`reservations` 保留领取单号，供活动页继续查询。当前实现对这五个 key 均未设置 TTL。
 
-### 3.5 Redis Stream → RabbitMQ 投递性能优化
+### 3.5 Redis Stream → RabbitMQ 批量投递与异步确认
 
-**当前问题：** `QuotaStreamDispatcher` 采用逐条发送、同步等待 Publisher Confirm 的方式：
+1. **异步 Confirm。** 投递器在同一发布信道连续发送多条持久化消息。每笔沿用原 `claimNo`，每次尝试使用独立的 `CorrelationData`。一笔消息只有收到 ACK 且未被 mandatory return 退回，才进入 Redis 清理列表。
+2. **批量与在途上限。** 每个投递实例串行处理批次，每批最多 100 条，在批次边界等待本批所有确认结果。即使多个活动同时有待办，每实例也最多有 100 条等待确认。每条确认超时为 5 秒。活动积压时连续读取，在批次之间检查 2 秒的活动扫描预算，再给其他活动投递机会。
+3. **部分成功与重投。** Lua 接收本批成功条目的 `(streamEntryId, userId, claimNo)` 三元组，逐条核对后执行 `XACK + XDEL + HDEL`。NACK、退回、异常和超时对应的记录留在 PEL，原有消费组在满足 30 秒接管阈值后按原单号重发。Redis 清理前进程退出可能导致重投，由入账事务幂等处理。
 
-~~~java
-rabbitTemplate.send("", queue.getName(), message, correlation);
-var confirm = correlation.getFuture().get(5, TimeUnit.SECONDS);
-~~~
+**2026-11-23 实测。** 同一开发环境，两种实现各预热 100 笔，再各测 3 轮，每轮 10,000 笔有效待办。投递耗时中位数从 **13.130 秒降至 0.880 秒（下降 93.3%）**，吞吐从 **762 提升至 11,359 笔/秒（约 14.9 倍）**。每轮均核对 10,000 个原单号和用户，RabbitMQ 漏投、重复均为 0。详见[逐轮结果与计时口径](Lua预扣与可靠投递/万笔可靠投递对比.md)。
 
-- 每条消息最多阻塞 5 秒，虽然正常 ACK 通常更快，但串行等待会限制吞吐量。
-- 假设每条消息确认耗时 100ms，100 条消息仅等待确认就需要约 10 秒。
-- RabbitMQ 响应缓慢时，Redis Stream 消息可能大量积压，影响额度到账速度。
+### 3.6 领取结果轮询与查询负载（本期暂缓专项优化）
 
-**优化方案：异步 Confirm + 批量投递 + 在途消息限流。**
+前端根据领取接口 `POST /api/quota/activities/{id}/claims` 的结果决定是否轮询。收到 `PROCESSING` 和 `claimNo` 表示 Redis 已为本人预扣一份，后续只需等待额度到账。同一会员重复点击时复用原单号和已有轮询任务。
 
-1. **异步发送：** 连续发送多条消息，通过 `CorrelationData.getFuture().whenComplete()` 异步处理 Confirm，避免逐条阻塞。
-2. **在途限流：** 使用 `Semaphore` 控制同时等待 Confirm 的消息数量，例如最多 100 条，避免无限积压。
-3. **可靠确认：** 只有 Confirm ACK 且没有 Return 时，才执行 Redis Lua，原子完成 `XACK + XDEL + HDEL pending`。
-4. **失败补偿：** Confirm NACK、Return 或超时均不确认 Stream 消息，继续保留 PEL 待办，由 `XPENDING + XCLAIM` 重新投递。
-5. **幂等保障：** 重投继续使用原 `claimNo`，MySQL 通过唯一约束和事务保证额度只入账一次。
+| 领取结果 | 活动页处理 |
+| --- | --- |
+| 已受理（`PROCESSING`） | 调用 `GET /api/quota/activities/{id}/claims/me` 查询本人的领取结果，收到 `GRANTED` 即停止轮询。 |
+| 已售罄、会员资格无效等明确拒绝 | 直接显示原因，无需启动轮询。 |
+| 请求超时，未收到回执 | 使用同一账号重试领取。若此前已预扣，服务端返回原单号，前端按已受理处理。 |
 
-**验收方式：** 分别使用同步 Confirm 和异步 Confirm 投递 100、1,000 条消息，比较投递耗时、吞吐量、PEL 积压数量及失败恢复情况，确保无漏发、无重复入账。
+在 5.3 节的实测中，1,000 名不同会员抢 100 份，100 人获受理，900 人收到售罄。因此最多只有 100 人需要轮询。举例而言，若这 100 人都还在等待到账，且每人每秒查询一次，则平均每秒约有 100 次状态查询；随着用户查到到账，轮询人数逐步减少。这个数字是按轮询间隔估算的负载，5.3 节实测的是领取和到账。
 
-**总结：** 保留 Publisher Confirm 和 Redis Stream 补偿机制，将逐条同步等待改为受限并发的异步确认，提高 RabbitMQ 投递吞吐量。
-
-### 3.6 领取状态查询性能优化
-
-**当前问题：** 前端轮询领取状态时，每次都会优先查询 MySQL `quota_claim`，无记录时再查询 Redis `reservations`。高并发秒杀下，大量用户频繁轮询可能导致 MySQL 查询 QPS 过高。
-
-**优化方案：联合索引 + 渐进式轮询 + 限流。**
-
-1. **索引优化：** 利用 `quota_claim(activityId, userId)` 联合唯一索引，快速定位用户领取记录，避免全表扫描。
-2. **渐进式轮询：** 前端领取成功后按 1 秒、2 秒、3 秒的间隔逐步查询，并加入随机抖动，避免大量请求同时到达。
-3. **停止条件：** 查询到 `GRANTED` 后立即停止轮询；超过最大轮询次数后显示“处理中”，允许用户手动刷新。
-4. **接口限流：** 对领取状态查询接口设置用户级限流，防止恶意请求或异常客户端频繁访问。
-5. **按需增加缓存：** 暂不引入 Redis 领取状态缓存，避免增加 MySQL 与 Redis 的一致性维护成本。如果压测发现 MySQL 查询成为瓶颈，再考虑缓存最终状态。
-
-**验收方式：** 模拟 1,000 名用户同时领取并轮询，统计 MySQL 查询 QPS、接口 P95/P99、错误率和数据库连接池使用情况，对比固定 1 秒轮询与渐进式轮询的性能差异。
-
-**总结：** 优先通过联合索引、渐进式轮询和限流降低 MySQL 压力，暂不增加 Redis 状态缓存，保持系统架构简单。
+本期沿用现有查询：先通过 MySQL 的 `(activityId, userId)` 联合唯一索引读取领取单，尚未入库时再查 Redis 预扣标记。后续若实际待到账人数、查询延迟或连接池等待明显增加，再评估渐进式轮询、限流或状态缓存。
 
 ## 四、第三步：入账事务与消费恢复
 
@@ -384,7 +365,7 @@ POST /api/quota/activities/{id}/claims
 
 ### 6.4 第二步：Stream 消费组与重投
 
-发布时执行 `XGROUP CREATE … quota-dispatch 0 MKSTREAM`。节点以独立消费者名执行 `XREADGROUP … >`，每批最多读取 16 条。已分配但未确认的消息保留在 PEL。节点用 `XPENDING` 分页定位记录，对空闲至少 30 秒的记录执行 `XCLAIM` 并重发。
+发布时执行 `XGROUP CREATE … quota-dispatch 0 MKSTREAM`。节点以独立消费者名执行 `XREADGROUP … >`，每批最多读取 100 条。已分配但未确认的消息保留在 PEL。节点用 `XPENDING` 分页定位记录，对空闲至少 30 秒的记录执行 `XCLAIM` 并重发。
 
 RabbitMQ 确认后通过 Lua 执行 `XACK`、`XDEL` 和 `HDEL pending`。若 Broker 收到消息、Redis 确认前进程退出，同一单号可能多次进入队列；第三步消费者负责入账幂等。
 
@@ -411,7 +392,7 @@ RabbitMQ 确认后通过 Lua 执行 `XACK`、`XDEL` 和 `HDEL pending`。若 Bro
 
 ### 6.6 第四步：前端查询领取结果
 
-活动页轮询或刷新时调用 `GET /api/quota/activities/{id}/claims/me`，用户 ID 取自登录态。本人在该活动已到账时返回 `GRANTED`，有预扣标记或待到账领取单时返回 `PROCESSING`，没有领取记录时返回“领取单不存在”。
+活动页收到领取回执 `PROCESSING` 后开始轮询，收到售罄则直接展示结果。轮询或刷新时调用 `GET /api/quota/activities/{id}/claims/me`，用户 ID 取自登录态。返回 `GRANTED` 时停止轮询；有预扣标记或待到账领取单时返回 `PROCESSING`，没有领取记录时返回“领取单不存在”。
 
 ### 6.7 关键异常与恢复规则
 
