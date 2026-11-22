@@ -185,6 +185,8 @@ public class QuotaBenchmarkNode {
         redis.opsForHash().put(reserved, "2", name + "-2");
         redis.opsForHash().put(reserved, "3", name + "-3");
         redis.opsForHash().put(pending, "2", name + "-2");
+        redis.opsForStream().add(prefix() + "outbox", java.util.Map.of("claimNo", name + "-2",
+                "activityId", Long.toString(id), "userId", "2", "grantAmount", "5"));
         jdbc.update("INSERT INTO quota_claim(activityId,userId,claimNo,grantAmount) VALUES(?,?,?,?)", id, 1, name+"-1", 5);
         redis.delete(stock);
         assertFalse(service.detail(id).isStockAvailable());
@@ -202,7 +204,7 @@ public class QuotaBenchmarkNode {
         if (id == 0) return;
         assertEquals(name, mapper.select(id).getName());
         jdbc.update("DELETE FROM quota_claim WHERE activityId=? AND claimNo=?", id, name+"-1");
-        var keys = List.of("stock", "reservations", "pending", "config", "config-version").stream()
+        var keys = List.of("stock", "reservations", "pending", "rules", "outbox", "config", "config-version").stream()
                 .map(k -> prefix()+k).toList();
         redis.delete(keys);
         assertEquals(0L, redis.countExistingKeys(keys));

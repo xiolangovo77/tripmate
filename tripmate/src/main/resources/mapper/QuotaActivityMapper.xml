@@ -56,4 +56,17 @@
         FROM quota_claim
         WHERE activityId = #{id}
     </select>
+    <select id="memberExpiry" resultType="java.lang.Long">
+        SELECT UNIX_TIMESTAMP(memberExpireAt) FROM `user`
+        WHERE id = #{userId} AND isDelete = 0
+    </select>
+
+    <select id="findClaim" resultType="com.ecnu.tripmate.quota.model.QuotaClaimResult">
+        SELECT activityId, claimNo, CASE status WHEN 'granted' THEN 'GRANTED' ELSE 'PROCESSING' END AS status
+        FROM quota_claim WHERE activityId = #{id} AND userId = #{userId}
+    </select>
+
+    <select id="publishedIdsAfter" resultType="_long">
+        SELECT id FROM quota_activity WHERE status = 'published' AND id &gt; #{cursor} ORDER BY id LIMIT 64
+    </select>
 </mapper>

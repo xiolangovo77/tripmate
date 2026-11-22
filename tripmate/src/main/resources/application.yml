@@ -1,4 +1,7 @@
 quota:
+  dispatch:
+    enabled: true
+    queue: tripmate.quota.grant
   cache:
     local-enabled: true
     maximum-size: 1024
@@ -12,6 +15,11 @@ avatar:
     quality: 0.85
     max-concurrent: 2
 spring:
+  rabbitmq:
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   servlet:
     multipart:
       max-file-size: 5MB      # 单个文件上限

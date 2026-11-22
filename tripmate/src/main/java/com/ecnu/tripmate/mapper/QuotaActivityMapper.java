@@ -5,6 +5,7 @@ import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.quota.model.ActivityClaim;
 import com.ecnu.tripmate.quota.model.ActivityConfig;
 import com.ecnu.tripmate.quota.model.CreateActivityRequest;
+import com.ecnu.tripmate.quota.model.QuotaClaimResult;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -29,4 +30,10 @@ public interface QuotaActivityMapper {
     void updateDisplay(@Param("id") long id, @Param("name") String name, @Param("ruleText") String ruleText);
 
     List<ActivityClaim> claims(@Param("id") long id);
+
+    Long memberExpiry(@Param("userId") long userId);
+
+    QuotaClaimResult findClaim(@Param("id") long id, @Param("userId") long userId);
+
+    List<Long> publishedIdsAfter(@Param("cursor") long cursor);
 }

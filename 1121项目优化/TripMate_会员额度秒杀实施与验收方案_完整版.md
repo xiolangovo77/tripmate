@@ -48,7 +48,7 @@
 | `config-version` | String，补齐到 19 位的配置版本号 | Lua 回填快照前原子比较版本，拒绝旧版本覆盖新版本；当前实现未设 TTL |
 | `stock` | String，当前剩余份数 | 每次查询已发布活动详情都直接读取；发布时初始化，当前实现未设 TTL |
 | `reservations` | Hash，预留 `userId → claimNo` 映射 | 库存恢复时用于核对全部预扣，包含已投递但可能尚未入账的份额；当前实现未设 TTL |
-| `pending` | Hash，预留 `userId → claimNo` 映射 | 库存恢复时用于核对待投递预扣；当前实现未设 TTL。第六节另述后续 Stream 投递方案 |
+| `pending` | Hash，预留 `userId → claimNo` 映射 | 库存恢复时用于核对待投递预扣；当前实现未设 TTL。待投递消息正文保存在 outbox Stream |
 
 首次发布时，Lua 同时初始化 `stock` 和两个 Hash，并在两个 Hash 中写入 `_total` 保存初始总份数；事务提交后预热配置。重复发布和应用重启都不会重置库存。`stock = 0` 表示售罄；键缺失时详情返回 `remainingStock = null`、`stockAvailable = false`，暂停领取。恢复时先核对 MySQL 领取单和两个 Hash，再用总份数减去已预扣份数。
 
@@ -70,16 +70,128 @@
 
 ## 三、第二步：Lua 预扣与可靠投递
 
-新增 `POST /api/quota/activities/{id}/claims`。服务端从登录态取用户 ID，校验会员有效期。一次领取生成一个 `claimNo`，接口预扣成功即返回该单号和“处理中”。前端通过 `GET /api/quota/claims/{claimNo}` 查询本人领取结果。
+本步验收到同一领取单号进入 RabbitMQ 持久化队列。领取接口立即返回 `PROCESSING`，第三步消费者负责实际到账。
 
-最容易漏掉的是 **Redis 已扣库存、进程却在发 RabbitMQ 前退出**。建议让 Lua 同时留下可重发的记录，具体顺序如下：
+| 接口 | 使用场景 |
+| --- | --- |
+| `POST /api/quota/activities/{id}/claims` | 活动页领取；身份取自登录态，返回 `activityId`、`claimNo`、`status`。 |
+| `GET /api/quota/activities/{id}/claims/me` | 活动页按活动 ID 查本人领取结果。每人每期一份，活动 ID 与登录用户 ID 即可定位唯一领取。 |
 
-1. 发布活动时，在 Redis 保存本期生效时间、每份额度及库存。Lua 先查 `userId → claimNo` 标记，已有标记就返回原单号。这样即使最后一份已被该用户抢到，其并发重试也能查回同一单。
-2. 对首次领取，Lua 检查活动窗口和剩余份数，然后在一次执行中完成扣一份库存、写用户领取标记、写待投递记录。记录包含 `claimNo、activityId、userId、grantAmount`。同一活动的相关 key 使用相同的 Redis hash tag。
-3. 投递任务扫描待投递记录，发送持久化消息到 RabbitMQ 持久化队列。收到 publisher confirm 且确认消息成功路由后，才移除待投递记录。超时或进程重启，使用**同一领取单号**重发。即便消息重复，后续也只会入账一次。
-4. 查询接口先读 MySQL 的最终结果；尚未入库时，根据 Redis 预扣记录返回“处理中”，并验证单号归属。预扣状态至少保留到活动结束且待办全部处理完毕。
+1. 发布时准备本期规则、库存和 Stream 消费组。领取时服务端读取会员有效期。Lua 先查本人既有标记；首次领取再校验会员、活动窗口和库存。
+2. Lua 原子写入 Stream、扣一份库存、登记用户领取标记及待投递索引。消息带有 `claimNo`、`activityId`、`userId`、`grantAmount`。
+3. 任务读取新消息或接管未确认消息，通过默认交换机按队列名向持久化队列发送持久化消息。仅在 publisher confirm 为 ACK 且 mandatory 消息未退回后，原子清理 Stream 记录与待投递索引。超时或重启沿用原领取单号重投。
+4. 查询接口按活动 ID 和登录用户 ID 读取 MySQL 领取记录。尚未入库时读取该用户的 Redis 预扣标记。Broker 确认投递后仍显示“处理中”。
 
-这样可以单独验收投递断点：停掉投递任务，领取一份，观察库存减少且结果为处理中；恢复任务后，同一单号应最终到账。运行这项测试时保留 Redis 预扣数据，Redis 自身的数据丢失属于另一类恢复场景。
+**断点验收。** 以 `quota.dispatch.enabled=false` 启动，领取后检查库存减一、Stream 留下一条记录、查询返回原单号。恢复投递后验证该单号进入持久化队列，Stream 待办清空，领取标记保留。管理页面使用 15672 端口，应用使用 AMQP 端口。本地凭据放在忽略提交的开发配置或环境变量中。
+
+在 `tripmate` 模块目录执行以下命令可复现。用例连接开发环境的 MySQL、Redis 和 RabbitMQ，使用独立的临时活动、用户和队列，并在结束时清理。
+
+```powershell
+mvn "-Dtest=QuotaClaimDeliveryIT" "-Dquota.dev.it=true" test
+```
+
+用例用 20 个工作线程发起同一会员的 100 次领取请求。库存为 1 份时，断言所有请求返回同一单号，剩余库存为 0，Stream 中只有 1 条消息。随后移除临时队列制造路由失败，核对待确认记录仍在；重建队列并等待 30 秒接管期后，新投递实例使用原单号补发。最后核对 RabbitMQ 消息的持久化属性、活动、用户、额度及单号，接口仍返回 `PROCESSING`。
+
+### 3.1 Redis Stream与RabbitMQ的对比
+
+![Redis Stream 消息队列架构图](D:\Google\Downloads\Redis Stream 消息队列架构图.png)
+
+| 对比维度     | Redis Stream                                          | RabbitMQ                                                     |
+| ------------ | ----------------------------------------------------- | ------------------------------------------------------------ |
+| 本质         | Redis 内置的消息日志数据结构                          | 专业的消息中间件                                             |
+| 消息生产     | 生产者通过 XADD 写入 Stream                           | 生产者将消息发送到 Exchange                                  |
+| 消息路由     | 无独立的路由器，生产者直接指定 Stream                 | Exchange 根据路由规则将消息投递到 Queue                      |
+| 消息存储     | Stream 保存消息，按消息 ID 排序                       | Queue 存储待消费的消息                                       |
+| 消费者组     | 显式支持 Consumer Group                               | 无完全对应的机制，多个 Consumer 可竞争消费同一 Queue         |
+| 多消费者消费 | 同一 Group 内多个 Consumer 分摊消息                   | 同一 Queue 的多个 Consumer 竞争消费消息                      |
+| 多组独立消费 | 一个 Stream 可以创建多个 Consumer Group，每组独立消费 | 一个 Exchange 可以将消息路由到多个 Queue，每个 Queue 独立消费 |
+| 消息确认     | XACK 确认，从对应 Group 的 PEL 移除                   | basicAck 确认，消息通常从 Queue 中移除                       |
+| 未确认消息   | 使用 PEL 记录已投递但未确认的消息                     | Broker 维护 Unacked 消息状态                                 |
+| 消费者宕机   | 通过 XAUTOCLAIM 等命令转移未确认消息                  | 消费者连接或 Channel 关闭后，未确认消息通常重新入队          |
+| 消息重试     | 需要应用程序结合 PEL、XAUTOCLAIM 等机制实现           | 支持重新入队、拒绝确认、死信队列等机制                       |
+| 消息持久化   | 依赖 Redis 的 AOF、RDB 等持久化机制                   | 支持持久化队列及持久化消息                                   |
+| 消息删除     | XACK 不删除原始消息，需要单独清理                     | 消息确认后通常从 Queue 中删除                                |
+| 消费语义     | 通常按至少一次消费设计，需要业务幂等                  | 通常按至少一次消费设计，需要业务幂等                         |
+| 适用场景     | 轻量异步任务、事件日志、简单消息队列                  | 复杂消息路由、业务解耦、可靠异步任务                         |
+
+### 3.2 RabbitMQ 生产者可靠性配置
+
+~~~yaml
+rabbitmq:
+  publisher-confirm-type: correlated
+  publisher-returns: true
+  template:
+    mandatory: true
+~~~
+
+| 配置                                 | 作用                                              |
+| ------------------------------------ | ------------------------------------------------- |
+| `publisher-confirm-type: correlated` | 开启 Confirm 机制，通过 ACK/NACK 确认消息发布结果 |
+| `publisher-returns: true`            | 开启 Spring 接收消息退回通知的机制                |
+| `mandatory: true`                    | 要求 RabbitMQ 退回无法路由到 Queue 的消息         |
+
+**核心区别：**
+- **Confirm：** 确认消息是否成功发布，不保证成功路由到 Queue。
+- **Mandatory：** 要求 RabbitMQ 退回无法路由的消息。
+- **Returns：** Spring 接收退回消息，并通过回调处理。
+
+**性能：** 正常情况下 Returns 和 Mandatory 的额外开销很小，只有消息无法路由时才会触发退回处理。
+
+### 3.3 RabbitMQ 队列持久化与消息持久化
+
+**TripMate 额度秒杀已同时实现队列持久化和消息持久化。**
+
+| 类型       | 实现方式                                          | 作用                                                      |
+| ---------- | ------------------------------------------------- | --------------------------------------------------------- |
+| 队列持久化 | `new Queue(queueName, true)`                      | `durable = true`，RabbitMQ 重启后队列仍然存在             |
+| 消息持久化 | `setDeliveryMode(MessageDeliveryMode.PERSISTENT)` | `delivery_mode = 2`，消息以持久化模式发送，支持重启后恢复 |
+| 发布确认   | `publisher-confirm-type: correlated`              | 通过 ACK/NACK 确认消息发布结果                            |
+
+**核心区别：**
+
+- **队列持久化：** 保证 RabbitMQ 重启后队列仍然存在。
+- **消息持久化：** 保证消息具备重启后恢复的能力。
+- **Publisher Confirm：** 确认 Broker 已处理消息发布，降低消息丢失风险。
+
+**总结：** TripMate 已实现队列持久化 + 消息持久化 + Publisher Confirm，配合消费者 ACK、业务幂等和失败补偿，提高额度消息处理的可靠性。
+
+### 3.4 第二步新增的 Redis 结构
+
+本步新增 `rules` 和 `outbox` 两个活动级 key，沿用 2.2 节的 `stock`、`reservations` 和 `pending`。以活动 1001 为例，五个 key 共用前缀 `tripmate:quota:activity:{1001}:`。其中 `{1001}` 是 Redis Cluster 的 hash tag，使同一活动的数据落在同一槽中，供 Lua 原子操作。
+
+| 新增 key 后缀 | 类型 | 字段与用途 |
+| --- | --- | --- |
+| `rules` | Hash | 发布时写入 `start`、`end`（Unix 时间戳，单位为秒）和 `grantAmount`（每份发放的 AI 使用次数）。Lua 用 Redis 当前时间判断 `start ≤ 当前时间 < end`，预扣时将每份额度复制到消息中。 |
+| `outbox` | Stream | 发布时创建消费组 `quota-dispatch`。每笔成功预扣通过 `XADD` 写入一条消息，字段为 `claimNo`、`activityId`、`userId`、`grantAmount`。投递任务用 Stream 条目 ID 确认消息，重发时沿用消息中的领取单号 `claimNo`。 |
+
+1. **预扣成功**时，同一次 Lua 执行写入 `outbox`、将 `stock` 减一，并在 `reservations` 和 `pending` 中分别写入 `userId → claimNo`。前者用于重复领取和本人查询，后者用于核对待投递预扣。两个 Hash 的保留字段 `_total` 均保存活动总份数。
+2. **投递任务读取消息**后，Redis 将条目登记在消费组的待确认列表（PEL）中。若投递实例退出，其他实例可在条目空闲满 30 秒后接管，按原单号重新投递。
+3. **RabbitMQ 确认且消息成功路由**后，Lua 执行 `XACK`、`XDEL` 和 `HDEL`，清除该条目的待确认状态、消息正文和 `pending` 中对应用户的索引。`reservations` 保留领取单号，供活动页继续查询。当前实现对这五个 key 均未设置 TTL。
+
+### 3.5 Redis Stream → RabbitMQ 投递性能优化
+
+**当前问题：** `QuotaStreamDispatcher` 采用逐条发送、同步等待 Publisher Confirm 的方式：
+
+~~~java
+rabbitTemplate.send("", queue.getName(), message, correlation);
+var confirm = correlation.getFuture().get(5, TimeUnit.SECONDS);
+~~~
+
+- 每条消息最多阻塞 5 秒，虽然正常 ACK 通常更快，但串行等待会限制吞吐量。
+- 假设每条消息确认耗时 100ms，100 条消息仅等待确认就需要约 10 秒。
+- RabbitMQ 响应缓慢时，Redis Stream 消息可能大量积压，影响额度到账速度。
+
+**优化方案：异步 Confirm + 批量投递 + 在途消息限流。**
+
+1. **异步发送：** 连续发送多条消息，通过 `CorrelationData.getFuture().whenComplete()` 异步处理 Confirm，避免逐条阻塞。
+2. **在途限流：** 使用 `Semaphore` 控制同时等待 Confirm 的消息数量，例如最多 100 条，避免无限积压。
+3. **可靠确认：** 只有 Confirm ACK 且没有 Return 时，才执行 Redis Lua，原子完成 `XACK + XDEL + HDEL pending`。
+4. **失败补偿：** Confirm NACK、Return 或超时均不确认 Stream 消息，继续保留 PEL 待办，由 `XPENDING + XCLAIM` 重新投递。
+5. **幂等保障：** 重投继续使用原 `claimNo`，MySQL 通过唯一约束和事务保证额度只入账一次。
+
+**验收方式：** 分别使用同步 Confirm 和异步 Confirm 投递 100、1,000 条消息，比较投递耗时、吞吐量、PEL 积压数量及失败恢复情况，确保无漏发、无重复入账。
+
+**总结：** 保留 Publisher Confirm 和 Redis Stream 补偿机制，将逐条同步等待改为受限并发的异步确认，提高 RabbitMQ 投递吞吐量。
 
 ## 四、第三步：入账事务与消费恢复
 
@@ -174,7 +286,7 @@ POST /api/quota/activities/{id}/claims
                          └─ 成功：立即返回 claimNo + PROCESSING
                                       │
                               后台 Stream 投递任务
-                              XREADGROUP / XAUTOCLAIM
+                              XREADGROUP / XPENDING / XCLAIM
                                       │
                                       ▼
                           RabbitMQ 持久化消息
@@ -195,63 +307,35 @@ POST /api/quota/activities/{id}/claims
                          事务提交成功 → RabbitMQ ACK
                                       │
                                       ▼
-                 GET /api/quota/claims/{claimNo}
-                 返回本人领取最终状态：SUCCESS / PROCESSING
+                 GET /api/quota/activities/{id}/claims/me
+                 返回本人领取最终状态：GRANTED / PROCESSING
 ```
 
 ### 6.2 Redis 数据结构与生命周期
 
-以活动 `1001`、用户 `2001`、领取单 `Q001` 为例，使用相同的 `{1001}` hash tag，确保 Redis Cluster 中一次 Lua 涉及的 key 属于同一 slot。
+以活动 1001 为例，以下键共享前缀 `tripmate:quota:activity:{1001}:`。
 
-| Redis key | 类型 | 存储内容 | 生命周期与注意事项 |
-| --- | --- | --- | --- |
-| `quota:{1001}:rule` | Hash | `status`、`startAt`、`endAt`、`grantAmount`、活动期标识等发布后固定的秒杀规则 | 与可编辑的展示配置缓存区分；活动运行中不得随展示配置 TTL 过期 |
-| `quota:{1001}:stock` | String | 剩余**份数** | 只在该期首次发布时初始化；不得因应用重启、重复发布或缓存未命中而重设 |
-| `quota:{1001}:user:2001` | String | 已领取的 `claimNo` | 先检查此标记再判断库存；保留到活动结束且对账完成 |
-| `quota:{1001}:claim:Q001` | Hash | `userId`、`activityId`、`grantAmount`、预扣状态与创建时间 | 用于 MySQL 尚未入库时的查询与归属校验；不能过早过期 |
-| `quota:{1001}:outbox` | Stream | 待投递消息：`claimNo`、`activityId`、`userId`、`grantAmount` | 使用消费组 PEL 管理未确认消息；未投递确认前禁止删除或裁剪 |
+| 键后缀 | 类型 | 数据和用途 |
+| --- | --- | --- |
+| `rules` | Hash | `start`、`end` 为 Unix 秒，`grantAmount` 为每份次数。发布状态取自已提交活动配置。 |
+| `stock` | String | 当前剩余份数。 |
+| `reservations` | Hash | `userId → claimNo`；用于去重、查询与库存核对，投递确认后继续保留。 |
+| `pending` | Hash | 待投递预扣的 `userId → claimNo` 对账索引。两个 Hash 的 `_total` 字段保存活动初始份数。 |
+| `outbox` | Stream | 保存消息正文及专属消费组 `quota-dispatch`。 |
 
-这里的 Redis Stream 是 **Lua 预扣与 RabbitMQ 之间的待投递中转**，不是替代 RabbitMQ 的最终业务消费队列。Redis 预扣数据应按活动生命周期保留，并配置持久化、备份和丢失后的对账流程；仅靠 Stream 不构成跨 Redis 故障的绝对不丢保证。
+上述键独立于配置缓存 TTL，进程重启后仍可读取 Redis 中的待办。
 
 ### 6.3 第一步：接口校验并调用 Lua 原子预扣
 
-1. `POST /api/quota/activities/{id}/claims` 从登录态获取 `userId`，服务端校验 `memberExpireAt` 是否仍有效，生成新的候选 `claimNo`；前端不能指定用户 ID 或发放次数。
-2. Lua **先检查** `quota:{id}:user:{userId}`。若已存在领取标记，直接返回原 `claimNo`，即使此时库存已经为零，也不会再扣一份。
-3. 未领取时，Lua 根据 Redis 中已发布的秒杀规则校验状态、时间窗口和库存（`stock > 0`）；规则或库存 key 缺失时直接拒绝预扣并报警，不从 MySQL 总份数重建运行中库存。
-4. 校验通过后，同一次 Lua 调用完成 `DECR stock`、`SET user→claimNo`、`HSET claim`、`XADD outbox`，写入的 `grantAmount` 必须来自服务端已发布的规则，而不是请求参数。
-5. Lua 返回成功后，接口立即返回 `claimNo` 和 `PROCESSING`；不等待 RabbitMQ 消费和 MySQL 入账。失败则返回明确的未开始、已结束、已售罄或系统不可用状态。
+1. 接口从会话取得用户 ID，读取 MySQL 会员到期时间，生成候选单号。
+2. Lua 先查 `reservations`；活动售罄后再次领取也可取回原单号。首次领取在 Redis 时间落入活动窗口且库存充足时执行 `XADD`、`DECR` 和两次 `HSET`。脚本先检查数据类型和库存值，以免执行中途出错留下部分写入。
+3. 发布时一次初始化库存、领取索引、规则和 Stream。运行中规则或 Stream 缺失时暂停新领取，核对数据后再恢复。
 
-**原子性边界：** Lua 保证脚本执行期间没有其他 Redis 命令插入，但**执行中报错不会自动回滚之前的写入**。因此必须在修改库存前完成参数、key 存在性及类型等可预见的校验，避免 `DECR` 成功后 `XADD` 失败；同时监控 Redis 内存、持久化和脚本错误，对异常预扣保留人工/自动对账恢复手段。
+### 6.4 第二步：Stream 消费组与重投
 
-### 6.4 第二步：Stream 维护待投递记录
+发布时执行 `XGROUP CREATE … quota-dispatch 0 MKSTREAM`。节点以独立消费者名执行 `XREADGROUP … >`，每批最多读取 16 条。已分配但未确认的消息保留在 PEL。节点用 `XPENDING` 分页定位记录，对空闲至少 30 秒的记录执行 `XCLAIM` 并重发。
 
-首次发布活动时创建消费组（重复创建应识别 `BUSYGROUP`，不能清空原 Stream）：
-
-```redis
-XGROUP CREATE quota:{1001}:outbox quota-dispatch 0 MKSTREAM
-```
-
-投递实例使用不同的消费者名称，例如 `instance-A`、`instance-B`，按批领取新消息：
-
-```redis
-XREADGROUP GROUP quota-dispatch instance-A COUNT 10 BLOCK 2000 STREAMS quota:{1001}:outbox >
-```
-
-消息被交给消费者后进入该消费组的 **PEL（Pending Entries List）**，即使投递进程退出，也不会因退出而自动消失。投递任务必须在 RabbitMQ **publisher confirm ACK 且确认已成功路由到目标持久化队列**后，才确认 Stream 消息：
-
-```redis
-XACK quota:{1001}:outbox quota-dispatch 1763700000000-0
-```
-
-`XACK` 只清除消费组中的待确认状态，**不删除 Stream 消息正文**；可以另设清理任务，在确认没有其他消费者/消费组依赖后再 `XDEL` 或安全裁剪，不能裁剪未确认记录。
-
-发生超时、投递任务重启时，使用 `XAUTOCLAIM` 接管空闲达到阈值的 PEL 消息，再按**原 `claimNo`**重发，例如：
-
-```redis
-XAUTOCLAIM quota:{1001}:outbox quota-dispatch instance-B 30000 0-0 COUNT 100
-```
-
-实际代码需要循环处理 `XAUTOCLAIM` 返回的游标，直到本轮扫描结束，并控制单条消息的重试次数、延迟和告警，避免持续失败时无限快速重投。
+RabbitMQ 确认后通过 Lua 执行 `XACK`、`XDEL` 和 `HDEL pending`。若 Broker 收到消息、Redis 确认前进程退出，同一单号可能多次进入队列；第三步消费者负责入账幂等。
 
 ### 6.5 第三步：RabbitMQ 发送、消费与数据库入账
 
@@ -276,14 +360,7 @@ XAUTOCLAIM quota:{1001}:outbox quota-dispatch instance-B 30000 0-0 COUNT 100
 
 ### 6.6 第四步：前端查询领取结果
 
-领取成功预扣后，前端保存 `claimNo`，调用 `GET /api/quota/claims/{claimNo}` 查询：
-
-- **MySQL 已存在本人领取单且已到账**：返回 `SUCCESS` 与到账次数。
-- **MySQL 尚无最终领取结果，Redis 存在与当前用户匹配的预扣记录**：返回 `PROCESSING`。
-- **存在失败/补偿记录或需要人工核对**：按实际状态返回 `FAILED` / `RECONCILING`，不要凭接口超时推断失败。
-- **单号不属于当前登录用户或无法验证归属**：拒绝返回他人的领取信息；Redis 和 MySQL 状态都缺失时不能凭空认定领取失败，应进入异常核对流程。
-
-前端可短时轮询并设置退避，页面展示“处理中”与最终结果；**不应在轮询中重复发起新领取**。即使重复点击，Lua 的用户领取标记也会返回相同的有效单号。
+活动页轮询或刷新时调用 `GET /api/quota/activities/{id}/claims/me`，用户 ID 取自登录态。本人在该活动已到账时返回 `GRANTED`，有预扣标记或待到账领取单时返回 `PROCESSING`，没有领取记录时返回“领取单不存在”。
 
 ### 6.7 关键异常与恢复规则
 
@@ -300,7 +377,7 @@ XAUTOCLAIM quota:{1001}:outbox quota-dispatch instance-B 30000 0-0 COUNT 100
 ### 6.8 开发顺序与验收断点
 
 1. **先做 Lua 预扣**：使用 1,000 个有效会员抢 100 份，验证库存、用户标记、预扣记录与 Stream 消息一致；同一会员并发重试 100 次只产生一个单号。
-2. **再做 Redis Stream → RabbitMQ 投递**：停掉投递任务，成功领取一份后观察状态为 `PROCESSING`，恢复任务后确认最终到账；另测发送成功但未 `XACK` 的重复投递。
+2. **再做 Redis Stream → RabbitMQ 投递**：停掉投递任务，成功领取一份后观察状态为 `PROCESSING`，恢复任务后确认原单号进入持久化队列，状态仍为处理中；另测发送成功但未 `XACK` 的重复投递。
 3. **再做 MySQL 事务和手动 ACK**：在数据库事务返回后、RabbitMQ ACK 前强停消费者，重启后验证原单号被重投，但只存在一条发放流水，余额只增加一次。
 4. **最后做 100 笔恢复与详情缓存 A/B 压测**：保留 JMeter 原始数据、Stream PEL/积压、RabbitMQ ready/unacked/DLQ、MySQL 对账 SQL 及故障开关。100 笔 ACK 恢复目标 ≤3 秒是**待测目标**，并非当前已验证的性能结论。
 
@@ -316,7 +393,7 @@ XAUTOCLAIM quota:{1001}:outbox quota-dispatch instance-B 30000 0-0 COUNT 100
 - MySQL 负责说明：**这笔额度最终有没有到账。**
 
 ```
-GET /api/quota/claims/Q001
+GET /api/quota/activities/1001/claims/me
              ↓
         查询 MySQL
              ↓
