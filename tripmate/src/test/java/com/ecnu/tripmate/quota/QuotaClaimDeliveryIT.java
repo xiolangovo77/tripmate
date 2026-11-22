@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.context.annotation.Bean;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
@@ -34,9 +37,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @EnabledIfSystemProperty(named = "quota.dev.it", matches = "true")
 class QuotaClaimDeliveryIT {
     @TestConfiguration(proxyBeanMethods = false)
-    @Import({QuotaBenchmarkNode.NodeConfig.class, QuotaClaimController.class, QuotaClaimService.class, QuotaDispatchConfig.class})
+    @Import({QuotaBenchmarkNode.NodeConfig.class, QuotaClaimController.class, QuotaClaimService.class,
+            QuotaDispatchConfig.class, QuotaGrantConsumerConfig.class, QuotaGrantService.class})
     @ImportAutoConfiguration(RabbitAutoConfiguration.class)
-    static class Config {}
+    static class Config {
+        @Bean
+        static BeanPostProcessor pauseGrantConsumer() {
+            return new BeanPostProcessor() {
+                @Override
+                public Object postProcessBeforeInitialization(Object bean, String name) {
+                    if (bean instanceof SimpleMessageListenerContainer container) container.setAutoStartup(false);
+                    return bean;
+                }
+            };
+        }
+    }
 
     @Test
     void pausedDeliveryCanResumeAndOnlyOwnerCanQuery() throws Exception {
@@ -129,13 +144,35 @@ class QuotaClaimDeliveryIT {
                     assertFalse(redis.hasKey(stock));
                     assertFalse(redis.hasKey(rules));
                     assertFalse(redis.hasKey(stream));
+                    // 将已核对的原消息交还队列，启用生产消费者并通过活动页接口观察到账。
+                    rabbit.send("", tag, delivered);
+                    var container = context.getBean("quotaGrantContainer", SimpleMessageListenerContainer.class);
+                    container.start();
+                    try {
+                        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+                        while (true) {
+                            var response = mvc.perform(get(url + "/me").session(session)).andReturn().getResponse();
+                            var result = json.readTree(response.getContentAsByteArray()).get("data");
+                            assertEquals(number, result.get("claimNo").asText());
+                            if ("GRANTED".equals(result.get("status").asText())) break;
+                            assertTrue(System.nanoTime() < deadline, "等待领取到账超时");
+                            Thread.sleep(50);
+                        }
+                        assertEquals(5L, jdbc.queryForObject("SELECT balance FROM quota_account WHERE userId=?", Long.class, owner));
+                    } finally {
+                        container.stop();
+                    }
                 }
             } finally {
                 try {
                     admin.deleteQueue(tag);
+                    admin.deleteQueue(tag + ".dead");
                 } finally {
                     redis.delete(List.of("outbox","pending","rules","reservations","stock","config","config-version").stream()
                             .map(suffix -> ActivityRedis.prefix(id) + suffix).toList());
+                    jdbc.update("DELETE f FROM quota_flow f JOIN quota_claim c ON c.claimNo=f.claimNo WHERE c.activityId=?", id);
+                    jdbc.update("DELETE a FROM quota_account a JOIN `user` u ON u.id=a.userId WHERE u.userAccount=? AND u.nickname=?", tag, tag);
+                    jdbc.update("DELETE FROM quota_claim WHERE activityId=?", id);
                     jdbc.update("DELETE FROM quota_activity WHERE id=? AND name=?", id, tag);
                     jdbc.update("DELETE FROM `user` WHERE userAccount IN (?,?) AND nickname=?", tag, otherAccount, tag);
                 }

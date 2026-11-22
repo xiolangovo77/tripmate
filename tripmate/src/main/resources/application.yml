@@ -1,4 +1,7 @@
 quota:
+  consumer:
+    enabled: true
+    prefetch: 16
   dispatch:
     enabled: true
     queue: tripmate.quota.grant

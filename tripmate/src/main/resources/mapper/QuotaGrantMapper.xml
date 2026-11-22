@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecnu.tripmate.mapper.QuotaGrantMapper">
+    <sql id="snapshot">SELECT claimNo, activityId, userId, grantAmount, status FROM quota_claim</sql>
+
+    <select id="findByNumber" resultType="com.ecnu.tripmate.quota.model.QuotaGrantClaim">
+        <include refid="snapshot"/> WHERE claimNo = #{claimNo}
+    </select>
+
+    <insert id="establishClaim">
+        INSERT INTO quota_claim (claimNo, activityId, userId, grantAmount)
+        SELECT #{claimNo}, a.id, u.id, a.grantAmount
+        FROM quota_activity a JOIN `user` u ON u.id = #{userId}
+        WHERE a.id = #{activityId} AND a.status = 'published' AND a.grantAmount = #{grantAmount}
+        ON DUPLICATE KEY UPDATE claimNo = quota_claim.claimNo
+    </insert>
+
+    <select id="lockByOwner" resultType="com.ecnu.tripmate.quota.model.QuotaGrantClaim">
+        <include refid="snapshot"/> WHERE activityId = #{activityId} AND userId = #{userId} FOR UPDATE
+    </select>
+
+    <insert id="insertFlow">
+        INSERT INTO quota_flow (claimNo, flowType, userId, amount)
+        VALUES (#{claimNo}, 'grant', #{userId}, #{grantAmount})
+    </insert>
+
+    <insert id="creditAccount">
+        INSERT INTO quota_account (userId, balance) VALUES (#{userId}, #{grantAmount})
+        ON DUPLICATE KEY UPDATE balance = balance + #{grantAmount}
+    </insert>
+
+    <update id="markGranted">
+        UPDATE quota_claim SET status = 'granted', grantedTime = CURRENT_TIMESTAMP
+        WHERE claimNo = #{claimNo} AND status = 'pending'
+    </update>
+</mapper>
