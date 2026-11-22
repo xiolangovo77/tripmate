@@ -1,10 +1,16 @@
 package com.ecnu.tripmate.quota;
 
+import com.ecnu.tripmate.cache.quota.ActivityRedis;
 import com.ecnu.tripmate.controller.QuotaClaimController;
 import com.ecnu.tripmate.controller.UserController;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.mapper.QuotaActivityMapper;
+import com.ecnu.tripmate.quota.config.QuotaDispatchConfig;
+import com.ecnu.tripmate.quota.config.QuotaGrantConsumerConfig;
 import com.ecnu.tripmate.quota.model.CreateActivityRequest;
+import com.ecnu.tripmate.service.QuotaActivityService;
+import com.ecnu.tripmate.service.QuotaClaimService;
+import com.ecnu.tripmate.service.QuotaGrantService;
 import com.ecnu.tripmate.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,6 +22,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.embedded.EmbeddedWebServerFactoryCustomizerAutoConfiguration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.context.annotation.Import;
@@ -37,7 +44,7 @@ class QuotaFlashSaleIT {
     @TestConfiguration(proxyBeanMethods = false)
     @Import({QuotaBenchmarkNode.NodeConfig.class, UserController.class, QuotaClaimController.class,
             QuotaClaimService.class, QuotaDispatchConfig.class, QuotaGrantConsumerConfig.class, QuotaGrantService.class})
-    @ImportAutoConfiguration(RabbitAutoConfiguration.class)
+    @ImportAutoConfiguration({RabbitAutoConfiguration.class, EmbeddedWebServerFactoryCustomizerAutoConfiguration.class})
     static class Config {}
 
     @Test

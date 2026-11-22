@@ -1,11 +1,17 @@
 package com.ecnu.tripmate.quota;
 
+import com.ecnu.tripmate.cache.quota.ActivityRedis;
 import com.ecnu.tripmate.constant.UserConstant;
 import com.ecnu.tripmate.controller.QuotaClaimController;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.mapper.QuotaActivityMapper;
 import com.ecnu.tripmate.model.entity.User;
+import com.ecnu.tripmate.quota.config.QuotaDispatchConfig;
+import com.ecnu.tripmate.quota.config.QuotaGrantConsumerConfig;
 import com.ecnu.tripmate.quota.model.CreateActivityRequest;
+import com.ecnu.tripmate.service.QuotaActivityService;
+import com.ecnu.tripmate.service.QuotaClaimService;
+import com.ecnu.tripmate.service.QuotaGrantService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;

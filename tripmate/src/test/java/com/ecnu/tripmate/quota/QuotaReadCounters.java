@@ -1,5 +1,6 @@
 package com.ecnu.tripmate.quota;
 
+import com.ecnu.tripmate.cache.quota.ActivityCache;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import io.lettuce.core.event.command.CommandListener;
 import io.lettuce.core.event.command.CommandStartedEvent;

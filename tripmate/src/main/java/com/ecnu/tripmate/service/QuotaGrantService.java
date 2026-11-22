@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.quota;
+package com.ecnu.tripmate.service;
 
 import com.ecnu.tripmate.mapper.QuotaGrantMapper;
 import com.ecnu.tripmate.quota.model.QuotaGrantClaim;

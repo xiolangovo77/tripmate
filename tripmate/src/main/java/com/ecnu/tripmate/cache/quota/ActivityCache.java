@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.quota;
+package com.ecnu.tripmate.cache.quota;
 
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
@@ -55,7 +55,7 @@ public class ActivityCache {
     }
 
     /** 活动配置快照的累计统计，用于按采样窗口计算 L1 命中率。 */
-    CacheStats snapshotStats() {
+    public CacheStats snapshotStats() {
         return snapshots.stats();
     }
 

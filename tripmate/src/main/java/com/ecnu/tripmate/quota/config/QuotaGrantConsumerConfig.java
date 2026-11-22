@@ -1,5 +1,7 @@
-package com.ecnu.tripmate.quota;
+package com.ecnu.tripmate.quota.config;
 
+import com.ecnu.tripmate.quota.QuotaGrantConsumer;
+import com.ecnu.tripmate.service.QuotaGrantService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.Declarables;
@@ -22,7 +24,7 @@ public class QuotaGrantConsumerConfig {
 
     @Bean
     public QuotaGrantConsumer quotaGrantConsumer(QuotaGrantService quotaGrantService, ObjectMapper objectMapper,
-            RabbitTemplate rabbitTemplate, @Value("${quota.dispatch.queue}") String queueName) {
+                                                 RabbitTemplate rabbitTemplate, @Value("${quota.dispatch.queue}") String queueName) {
         return new QuotaGrantConsumer(quotaGrantService, objectMapper, rabbitTemplate, queueName + ".dead");
     }
 

@@ -1,8 +1,10 @@
-package com.ecnu.tripmate.quota;
+package com.ecnu.tripmate.service;
 
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
 import com.ecnu.tripmate.mapper.QuotaActivityMapper;
+import com.ecnu.tripmate.cache.quota.ActivityCache;
+import com.ecnu.tripmate.cache.quota.ActivityRedis;
 import com.ecnu.tripmate.quota.model.QuotaClaimResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

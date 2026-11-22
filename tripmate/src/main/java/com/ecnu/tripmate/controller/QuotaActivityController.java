@@ -5,7 +5,7 @@ import com.ecnu.tripmate.common.ResultUtils;
 import com.ecnu.tripmate.constant.UserConstant;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
-import com.ecnu.tripmate.quota.QuotaActivityService;
+import com.ecnu.tripmate.service.QuotaActivityService;
 import com.ecnu.tripmate.quota.model.ActivityDetail;
 import com.ecnu.tripmate.quota.model.CreateActivityRequest;
 import com.ecnu.tripmate.quota.model.UpdateActivityDisplayRequest;

@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.quota;
+package com.ecnu.tripmate.cache.quota;
 
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;
@@ -37,7 +37,7 @@ public class ActivityRedis {
     /**
      * RabbitMQ 确认投递后，确认并删除 Stream 消息，清除对应待投递索引，保留用户领取标记。
      */
-    static final DefaultRedisScript<Long> CONFIRM = script("confirm", Long.class);
+    public static final DefaultRedisScript<Long> CONFIRM = script("confirm", Long.class);
 
     private static <T> DefaultRedisScript<T> script(String name, Class<T> type) {
         var script = new DefaultRedisScript<T>();
@@ -178,7 +178,7 @@ public class ActivityRedis {
         return value == null ? null : Long.valueOf(value);
     }
 
-    static String prefix(long id) {
+    public static String prefix(long id) {
         return "tripmate:quota:activity:{" + id + "}:";
     }
 

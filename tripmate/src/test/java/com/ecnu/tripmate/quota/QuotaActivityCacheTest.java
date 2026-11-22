@@ -1,8 +1,11 @@
 package com.ecnu.tripmate.quota;
 
+import com.ecnu.tripmate.cache.quota.ActivityCache;
+import com.ecnu.tripmate.cache.quota.ActivityRedis;
 import com.ecnu.tripmate.mapper.QuotaActivityMapper;
 import com.ecnu.tripmate.quota.model.ActivityConfig;
 import com.ecnu.tripmate.quota.model.ActivityDetail;
+import com.ecnu.tripmate.service.QuotaActivityService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 

@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.cache;
+package com.ecnu.tripmate.cache.ltinerary;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.ecnu.tripmate.exception.BusinessException;

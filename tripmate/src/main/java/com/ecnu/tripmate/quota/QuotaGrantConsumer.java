@@ -1,6 +1,7 @@
 package com.ecnu.tripmate.quota;
 
 import com.ecnu.tripmate.quota.model.QuotaGrantMessage;
+import com.ecnu.tripmate.service.QuotaGrantService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;

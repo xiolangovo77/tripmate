@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.cache;
+package com.ecnu.tripmate.cache.ltinerary;
 
 import cn.hutool.json.JSONConfig;
 import cn.hutool.json.JSONUtil;

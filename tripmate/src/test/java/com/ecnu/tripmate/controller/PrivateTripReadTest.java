@@ -1,6 +1,6 @@
 package com.ecnu.tripmate.controller;
 
-import com.ecnu.tripmate.cache.ItineraryCache;
+import com.ecnu.tripmate.cache.ltinerary.ItineraryCache;
 import com.ecnu.tripmate.constant.UserConstant;
 import com.ecnu.tripmate.exception.GlobalExceptionHandler;
 import com.ecnu.tripmate.mapper.TripMemberMapper;

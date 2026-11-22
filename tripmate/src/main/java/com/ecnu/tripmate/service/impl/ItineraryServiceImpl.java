@@ -5,7 +5,7 @@ import com.ecnu.tripmate.ai.AiItineraryGeneratorService;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorServiceFactory;
 import com.ecnu.tripmate.ai.model.ItineraryItemResult;
 import com.ecnu.tripmate.ai.model.ItineraryResult;
-import com.ecnu.tripmate.cache.ItineraryCache;
+import com.ecnu.tripmate.cache.ltinerary.ItineraryCache;
 import com.ecnu.tripmate.event.TripItineraryChangedEvent;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;

@@ -1,5 +1,7 @@
 package com.ecnu.tripmate.cache;
 
+import com.ecnu.tripmate.cache.ltinerary.ItineraryCache;
+import com.ecnu.tripmate.cache.ltinerary.ItineraryCacheLoader;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryItemVO;
 import com.ecnu.tripmate.model.vo.itinerary.ItineraryVO;
 import org.junit.jupiter.api.BeforeEach;

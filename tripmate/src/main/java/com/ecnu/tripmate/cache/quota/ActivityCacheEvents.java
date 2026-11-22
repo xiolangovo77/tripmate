@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.quota;
+package com.ecnu.tripmate.cache.quota;
 
 import com.ecnu.tripmate.quota.model.ActivityConfig;
 import com.ecnu.tripmate.quota.model.ActivityConfigChangedEvent;

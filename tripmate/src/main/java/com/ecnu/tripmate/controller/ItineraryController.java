@@ -1,7 +1,7 @@
 package com.ecnu.tripmate.controller;
 
 import com.ecnu.tripmate.common.BaseResponse;
-import com.ecnu.tripmate.cache.ItineraryCache;
+import com.ecnu.tripmate.cache.ltinerary.ItineraryCache;
 import com.ecnu.tripmate.common.ResultUtils;
 import com.ecnu.tripmate.exception.BusinessException;
 import com.ecnu.tripmate.exception.ErrorCode;

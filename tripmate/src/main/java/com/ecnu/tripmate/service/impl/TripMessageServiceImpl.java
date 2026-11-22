@@ -5,7 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorService;
 import com.ecnu.tripmate.ai.AiItineraryGeneratorServiceFactory;
-import com.ecnu.tripmate.cache.TripChatHistoryCache;
+import com.ecnu.tripmate.cache.tripchathistory.TripChatHistoryCache;
 import com.ecnu.tripmate.model.dto.ai.TripChatTurn;
 import com.ecnu.tripmate.ai.model.MessageResponseResult;
 import com.ecnu.tripmate.exception.BusinessException;

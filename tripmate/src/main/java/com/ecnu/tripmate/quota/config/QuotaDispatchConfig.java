@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.quota;
+package com.ecnu.tripmate.quota.config;
 
 import org.springframework.amqp.core.Queue;
 import org.springframework.beans.factory.annotation.Value;

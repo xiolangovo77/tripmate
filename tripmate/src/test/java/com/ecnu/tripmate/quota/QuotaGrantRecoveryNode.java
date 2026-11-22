@@ -1,6 +1,9 @@
 package com.ecnu.tripmate.quota;
 
 import com.ecnu.tripmate.mapper.QuotaGrantMapper;
+import com.ecnu.tripmate.quota.config.QuotaDispatchConfig;
+import com.ecnu.tripmate.quota.config.QuotaGrantConsumerConfig;
+import com.ecnu.tripmate.service.QuotaGrantService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.spring.boot.FlexTransactionAutoConfiguration;
 import com.mybatisflex.spring.boot.MybatisFlexAutoConfiguration;

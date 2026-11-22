@@ -2,7 +2,7 @@ package com.ecnu.tripmate.controller;
 
 import com.ecnu.tripmate.common.BaseResponse;
 import com.ecnu.tripmate.common.ResultUtils;
-import com.ecnu.tripmate.quota.QuotaClaimService;
+import com.ecnu.tripmate.service.QuotaClaimService;
 import com.ecnu.tripmate.quota.model.QuotaClaimResult;
 import com.ecnu.tripmate.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;

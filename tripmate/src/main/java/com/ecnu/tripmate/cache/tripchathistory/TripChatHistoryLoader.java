@@ -1,4 +1,4 @@
-package com.ecnu.tripmate.cache;
+package com.ecnu.tripmate.cache.tripchathistory;
 
 import cn.hutool.core.util.StrUtil;
 import com.ecnu.tripmate.model.dto.ai.TripChatTurn;

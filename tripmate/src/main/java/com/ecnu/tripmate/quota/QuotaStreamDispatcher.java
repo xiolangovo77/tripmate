@@ -1,5 +1,6 @@
 package com.ecnu.tripmate.quota;
 
+import com.ecnu.tripmate.cache.quota.ActivityRedis;
 import com.ecnu.tripmate.mapper.QuotaActivityMapper;
 import com.ecnu.tripmate.quota.model.QuotaGrantMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
